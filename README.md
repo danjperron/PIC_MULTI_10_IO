@@ -39,7 +39,7 @@ Multi-Purpose RS-485 with Modbus Protocol using a small cpu PIC16F1827
 
   The Schematic
 
-    - PIC_Multi10.jpg  Electronic schematic.
+    - MultiIO10.png  Electronic schematic.
 
   The GPL License
 
