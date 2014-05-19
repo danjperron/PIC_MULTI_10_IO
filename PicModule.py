@@ -49,6 +49,8 @@ class PicMbus:
 
 
   def config(self,Pin,value):
+    #enable configuration change
+    self.module.write_register(0x1ff,0x5678,0,6)
     self.module.write_register(0x100+Pin,value,0,6)
     self.IOConfig[Pin]= value
 

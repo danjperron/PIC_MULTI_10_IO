@@ -61,6 +61,8 @@ V1.0
 #define IOCONFIG_SERVO     64
 #define IOCONFIG_COUNTER   128
 
+
+int Baud= 57600;
 void  ReadDHT22(modbus_t * mb,int _io)
 {
     float Factor,Temperature,Humidity;
@@ -158,6 +160,21 @@ void RawData(modbus_t * mb, unsigned char _io, char * Label, unsigned char Size)
   }
 }
 
+void DisplayCounter(modbus_t * mb, unsigned char _io)
+{
+  uint32_t Counter;
+  uint16_t MB_Register[3];
+  int loop;
+    printf("%-20s","COUNTER");
+  if(modbus_read_input_registers(mb,_io*16,3,MB_Register)<0)
+     printf("Unable to read COUNTER\n");
+  else
+  {
+    Counter = (((unsigned int) MB_Register[0])<<16)|MB_Register[1]; 
+    printf("Count: %10lu   Pulse/sec: %u\n",Counter,MB_Register[2]);
+  }
+}
+
 void RegisterData(modbus_t * mb, unsigned char _io, char * Label)
 {
   uint16_t MB_Register;
@@ -243,7 +260,7 @@ void PrintModule(modbus_t * mb,unsigned char _module)
        case IOCONFIG_DS18B20:     ReadDS18B20(mb,_io);break;
        case IOCONFIG_PWM:         RegisterData(mb,_io,"PWM");break;
        case IOCONFIG_SERVO:       RegisterData(mb,_io,"R/C SERVO");break;
-       case IOCONFIG_COUNTER:    RawData(mb,_io,"COUNTER",3);break;
+       case IOCONFIG_COUNTER:     DisplayCounter(mb,_io);break;
        default:   printf("\n");
       }
 
@@ -265,14 +282,14 @@ int main(int argc, char * argv[])
 
    modbus_t *mb;
 
-   mb = modbus_new_rtu("/dev/ttyAMA0",57600,'N',8,1);
+   mb = modbus_new_rtu("/dev/ttyAMA0",Baud,'N',8,1);
    modbus_connect(mb);
 
 
    // Fset time out to 1/100 of second
    struct timeval response;
    response.tv_sec=0;
-   response.tv_usec=7000;
+   response.tv_usec=10000;
    modbus_set_response_timeout(mb, &response);
 
 

@@ -230,6 +230,8 @@ void changeAddress(modbus_t * mb)
           else
           {
    	   modbus_set_slave(mb,CurrentSlaveAddress);
+           // unlock confiration
+           modbus_write_register(mb,0x1ff,0x5678);
            modbus_write_register(mb,160,new_Address);
            printf("Module is now on Address %d\n",new_Address);
            CurrentSlaveAddress=new_Address;
@@ -346,6 +348,8 @@ void changeConfigMode(modbus_t * mb,int Pin)
       if(IsConfigValidOnPin(new_mode,Pin))
         {
           MB_mode= new_mode;
+          // Enable configuration change
+          modbus_write_register(mb,0x1ff,0x5678);
           modbus_write_register(mb,0x100+Pin,MB_mode);
          printf("Module %d  IO%d set to %d: %s\n",CurrentSlaveAddress,Pin,MB_mode,configModeInText(MB_mode));
         }
@@ -667,7 +671,7 @@ int SelectedIO;
  while(1)
   {
     // print menu
-    printf("\n\n\nM) MODBUS scan \n");
+    printf("\n\nM) MODBUS scan \n");
     printf("F) FLush  buffer\n");
     printf("A) Select Slave Module\n");
     if(CurrentSlaveAddress!=255)
