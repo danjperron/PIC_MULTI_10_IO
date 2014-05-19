@@ -16,6 +16,7 @@ extern "C" {
 
 
 extern void DoRCServo(void);
+extern near unsigned char ServoMask;
 extern unsigned char ServoIndex;
 extern unsigned short ServoTimer[INPUT_COUNT];
 extern short ServoIdleTime;

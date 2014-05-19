@@ -282,6 +282,7 @@ unsigned char SerialSum;    // use for check sum
 unsigned char RcvSerialSum;  // use for check sum verification
 bit ModbusOnTransmit;
 bit ForceReset;
+bit EnableConfigChange;
 char ModbusPacketBuffer[SERIAL_BUFFER_SIZE] @ 0x220;
 
 
@@ -379,8 +380,6 @@ TimerDeciSec=10;
 TMR2IE=1;
 PEIE = 1;
 GIE=1;
-COUNTER0=0;
-COUNTER1=0;
 }
 
 void InitA2D()
@@ -543,26 +542,17 @@ void SetIOConfig(unsigned char Pin)
 
   if(Pin<5)
   {
-     IOCounterFlag & = NOT_IOMASK[Pin];
+     IOCounterFlag.Byte & = NOT_IOMASK[Pin];
   }
 
   if(Pin==0)
   {
-//      IOCounterFlagbits.IO0=0;
       CCP1CON=0;
   }
-//  if(Pin==1)
- //     IOCounterFlagbits.IO1=0;
-
-//  if(Pin==2)
-//      IOCounterFlagbits.IO2=0;
  if(Pin==3)
  {
-//      IOCounterFlagbits.IO3=0;
       CCP2CON=0;
  }
-// if(Pin==4)
-//      IOCounterFlagbits.IO4=0;
   if(Pin==8)
       CCP3CON=0;
   if(Pin==9)
@@ -595,15 +585,15 @@ void SetIOConfig(unsigned char Pin)
                             SetInputConfig(Pin);
                             SetIOChange(Pin,1);
                             if(Pin==0)
-                                IOCounterFlagbits.IO0=1;
+                                IOCounterFlag.IO0=1;
                             if(Pin==1)
-                                IOCounterFlagbits.IO1=1;
+                                IOCounterFlag.IO1=1;
                             if(Pin==2)
-                                IOCounterFlagbits.IO2=1;
+                                IOCounterFlag.IO2=1;
                             if(Pin==3)
-                                IOCounterFlagbits.IO3=1;
+                                IOCounterFlag.IO3=1;
                             if(Pin==4)
-                                IOCounterFlagbits.IO4=1;
+                                IOCounterFlag.IO4=1;
   }
   else if((ioconfig.CAP_SENSE) || (ioconfig.Config == IOCONFIG_INPUT))
   {
@@ -651,45 +641,100 @@ __delay_ms(1);
 }
 
 
+
 static void interrupt isr(void){
     static volatile unsigned char _temp;
 
-//timer1  rcservo
 
-if(TMR1IE)
-  if(TMR1IF)
-  {
+// timer 1 use by R/C Servo
+    if(TMR1IE)
+    if(TMR1IF)
+{
     TMR1IF=0;
     if(ServoIndex<5)
     {
-      // di();
-       PORTB &=NOT_IOMASK[ServoIndex];
-     //  ei();
+      //PORTB &= ServoMask
+#asm
+        movf _ServoMask,w
+        andwf _PORTB,f
+#endasm
     }
     else
     {
-     //   di();
-        PORTA &=NOT_IOMASK[ServoIndex];
-     //   ei();
-
+      // PORTA &= ServoMask
+#asm
+        movf _ServoMask,w
+        andwf _PORTA,f
+#endasm
     }
     TMR1ON=0;
   }
-     
-// check interrupts on change
 if(IOCIE)
 if(IOCIF)
  {
 //    IOCBF=0;
-     _TMR0= TMR0;
-  
-      _temp = IOCBF & IOCBN;
+
+//      _TMR0 = TMR0;
+#asm
+    movf _TMR0,w
+    movwf __TMR0
+#endasm
+
+      if(IOCBF & DHTFlag)
+      {
+          // to speed up things, reducing interrupt process ,
+          // store timer 0 info into  circular buffer and
+          // figure out timing calculation on main program
+// use assembly (2 us faster)
+//          DHTBitBuffer[DHTBufferIndex++]=_TMR0;
+//          if(DHTBufferIndex<46)
+//              DHTBufferIndex++;
+//          TMR0=0;
+
+#asm
+   clrf _TMR0
+   banksel(_DHTBufferIndex)
+   movf _DHTBufferIndex^512,w
+   addlw 0x20
+   movwf 6
+   movlw 2
+   movwf 7
+   movf _DHTBufferIndex^512,w
+   sublw 45
+   skipnc
+   incf _DHTBufferIndex^512,f
+   banksel(0)
+   movf __TMR0,w
+   movwf 1
+; IOCBF&=~DHTFlag;
+   comf _DHTFlag,w
+   movlb 7; select bank 7
+   andwf _IOCBF&0x7f,f
+#endasm
+
+ }
+
+//}
+
+    //  _temp = IOCBF & IOCBN;
+    {
+#asm
+    movlb  7 ; select bank7
+    movf   22,w
+    andwf  21,w
+    skipnz
+    goto SKIPIOC
+    movlb  0
+    movwf isr@_temp
+#endasm            
+    }
+    
     if(_temp&8)
     {
         //IO0
         IOCBFbits.IOCBF3=0;
 
-        if(IOCounterFlagbits.IO0)
+        if(IOCounterFlag.IO0)
         {
 //            IOSensorData[0].DWORD++;
 //             COUNTER0++;
@@ -697,226 +742,302 @@ if(IOCIF)
 // MODBUS use BIG ENDIAN
 // IOSensorData force to be bank3 so it is ^384
 // IOSensorData is 6BYTE
-
-
-#define ARRAY0 0
-#define ARRAY1 (SENSOR_DATA_BYTE_MAX)
-#define ARRAY2 (2*(SENSOR_DATA_BYTE_MAX))
-#define ARRAY3 (3*(SENSOR_DATA_BYTE_MAX))
-#define ARRAY4 (4*(SENSOR_DATA_BYTE_MAX))
-
-// IOSensorData and COUNTER at same bank
-
-#asm
-        movlw 1
-        banksel(_IOSensorData)
-        addwf ((_IOSensorData+3)^384),f
-        movlw 0
-        addwfc ((_IOSensorData+2)^384),f
-        addwfc ((_IOSensorData+1)^384),f
-        addwfc (_IOSensorData^384),f
-        movlw 1
-//      same bank than iosensordata
-//        banksel(_COUNTER0)
-        addwf ((_COUNTER0+1)^384),f
-        movlw 0
-        addwfc (_COUNTER0^384),f
-
+// to reduce time on irq just increment ICOUNTER
+// and then on main program  add ICOUNTER IOSensorData[0].DWORD++;
+            
+#asm 
+        banksel(_ICOUNTER)
+        incf _ICOUNTER^384,f
+        btfss _IOCounterReset,3
+        goto  INCCOUNTERIO0
+        bcf _IOCounterReset,3
+        movf (_COUNTER)^384,w
+        movwf (_IOSensorData+4)^384
+        movf (_COUNTER+1)^384,w
+        movwf (_IOSensorData+5)^384
+        clrf (_COUNTER)^384
+        clrf (_COUNTER+1)^384
+INCCOUNTERIO0:
+        incf ((_COUNTER+1)^384),f
+        skipnz
+        incf (_COUNTER^384),f
+        movlb 0
 #endasm
 
-
-
-
         }
-        else if(DHTFlagbits.IO0)
-        {
-            TMR0=0;
-            DHT22IOCBF();
-        }
-
+ 
     }
-    if(_temp&0x10)
+
+      if(_temp&0x10)
     {
         //IO1
         IOCBFbits.IOCBF4=0;
 
-        if(IOCounterFlagbits.IO1)
+        if(IOCounterFlag.IO1)
         {
 //           IOSensorData[1].DWORD++;
 //            COUNTER1++;
 // use assembly since variable need to be   big endian
+//
+//
+//
+// to reduce time on irq just increment ICOUNTER
+// and then on main program  add ICOUNTER IOSensorData[1].DWORD++;
 
 #asm
-        movlw 1
-        banksel(_IOSensorData)
-        addwf ((_IOSensorData+ARRAY1+3)^384),f
-        movlw 0
-        addwfc ((_IOSensorData+ARRAY1+2)^384),f
-        addwfc ((_IOSensorData+ARRAY1+1)^384),f
-        addwfc ((_IOSensorData+ARRAY1)^384),f
-        movlw 1
-//        banksel(_COUNTER1)
-        addwf ((_COUNTER1+1)^384),f
-        movlw 0
-        addwfc (_COUNTER1^384),f
-
+        banksel(_ICOUNTER)
+        incf (_ICOUNTER+1)^384,f
+        btfss _IOCounterReset,4
+        goto  INCCOUNTERIO1
+        bcf _IOCounterReset,4
+        movf (_COUNTER+2)^384,w
+        movwf (_IOSensorData+4+ARRAY1)^384
+        movf (_COUNTER+3)^384,w
+        movwf (_IOSensorData+5+ARRAY1)^384
+        clrf (_COUNTER+2)^384
+        clrf (_COUNTER+3)^384
+INCCOUNTERIO1:
+        incf ((_COUNTER+3)^384),f
+        skipnz
+        incf ((_COUNTER+2)^384),f
+        movlb 0
 #endasm
 
-
-        }
-        else if(DHTFlagbits.IO1)
-        {
-            TMR0=0;
-            DHT22IOCBF();
         }
     }
+
     if(_temp&0x20)
     {
         //IO2
         IOCBFbits.IOCBF5=0;
 
-        if(IOCounterFlagbits.IO2)
+        if(IOCounterFlag.IO2)
         {
 //           IOSensorData[2].DWORD++;
 //            COUNTER2++;
 // use assembly since variable need to be   big endian
+// to reduce time on irq just increment ICOUNTER
+// and then on main program  add ICOUNTER IOSensorData[2].DWORD++;
 
 #asm
-        movlw 1
-        banksel(_IOSensorData)
-        addwf ((_IOSensorData+ARRAY2+3)^384),f
-        movlw 0
-        addwfc ((_IOSensorData+ARRAY2+2)^384),f
-        addwfc ((_IOSensorData+ARRAY2+1)^384),f
-        addwfc ((_IOSensorData+ARRAY2)^384),f
-        movlw 1
-//        banksel(_COUNTER2)
-        addwf ((_COUNTER2+1)^384),f
-        movlw 0
-        addwfc (_COUNTER2^384),f
-
+        banksel(_ICOUNTER)
+        incf (_ICOUNTER+2)^384,f
+        btfss _IOCounterReset,5
+        goto  INCCOUNTERIO2
+        bcf _IOCounterReset,5
+        movf (_COUNTER+4)^384,w
+        movwf (_IOSensorData+4+ARRAY2)^384
+        movf (_COUNTER+5)^384,w
+        movwf (_IOSensorData+5+ARRAY2)^384
+        clrf (_COUNTER+4)^384
+        clrf (_COUNTER+5)^384                  
+INCCOUNTERIO2:
+        incf ((_COUNTER+5)^384),f
+        skipnz
+        incf ((_COUNTER+4)^384),f
+        movlb 0
 #endasm
 
-
         }
-        else if(DHTFlagbits.IO2)
-        {
-            TMR0=0;
-            DHT22IOCBF();
-        }
-
+ 
     }
+
     if(_temp&0x40)
     {
         //IO3
         IOCBFbits.IOCBF6=0;
 
-        if(IOCounterFlagbits.IO3)
+        if(IOCounterFlag.IO3)
         {
 //           IOSensorData[3].DWORD++;
 //            COUNTER3++;
-          // use assembly since variable need to be   big endian
+// use assembly since variable need to be   big endian
+// to reduce time on irq just increment ICOUNTER
+// and then on main program  add ICOUNTER IOSensorData[3].DWORD++;
 
 #asm
-        movlw 1
-        banksel(_IOSensorData)
-        addwf ((_IOSensorData+ARRAY3+3)^384),f
-        movlw 0
-        addwfc ((_IOSensorData+ARRAY3+2)^384),f
-        addwfc ((_IOSensorData+ARRAY3+1)^384),f
-        addwfc ((_IOSensorData+ARRAY3)^384),f
-        movlw 1
-//        banksel(_COUNTER3)
-        addwf ((_COUNTER3+1)^384),f
-        movlw 0
-        addwfc (_COUNTER3^384),f
-
+        
+        banksel(_ICOUNTER)
+        incf (_ICOUNTER+3)^384,f
+        btfss _IOCounterReset,6
+        goto  INCCOUNTERIO3
+        bcf _IOCounterReset,6
+        movf (_COUNTER+6)^384,w
+        movwf (_IOSensorData+4+ARRAY3)^384
+        movf (_COUNTER+7)^384,w
+        movwf (_IOSensorData+5+ARRAY3)^384
+        clrf (_COUNTER+6)^384
+        clrf (_COUNTER+7)^384
+INCCOUNTERIO3:
+        incf ((_COUNTER+7)^384),f
+        skipnz
+        incf ((_COUNTER+6)^384),f
+        movlb 0
 #endasm
 
-
-        }
-        else if(DHTFlagbits.IO3)
-        {
-            TMR0=0;
-            DHT22IOCBF();
         }
     }
-    if(_temp&0x80)
+
+      if(_temp&0x80)
     {
         //IO4
         IOCBFbits.IOCBF7=0;
 
-        if(IOCounterFlagbits.IO4)
+        if(IOCounterFlag.IO4)
         {
 //           IOSensorData[4].DWORD++;
 //            COUNTER4++;
           // use assembly since variable need to be   big endian
+// to reduce time on irq just increment ICOUNTER
+// and then on main program  add ICOUNTER IOSensorData[4].DWORD++;
 
 #asm
-        movlw 1
-        banksel(_IOSensorData)
-        addwf ((_IOSensorData+ARRAY4+3)^384),f
-        movlw 0
-        addwfc ((_IOSensorData+ARRAY4+2)^384),f
-        addwfc ((_IOSensorData+ARRAY4+2)^384),f
-        addwfc ((_IOSensorData+ARRAY4)^384),f
-        movlw 1
-//        banksel(_COUNTER4)
-        addwf ((_COUNTER4+1)^384),f
-        movlw 0
-        addwfc (_COUNTER4^384),f
-
+        banksel(_ICOUNTER)
+        incf (_ICOUNTER+4)^384,f
+        btfss _IOCounterReset,7
+        goto  INCCOUNTERIO4
+        bcf _IOCounterReset,7
+        movf (_COUNTER+8)^384,w
+        movwf (_IOSensorData+4+ARRAY4)^384
+        movf (_COUNTER+9)^384,w
+        movwf (_IOSensorData+5+ARRAY4)^384
+        clrf (_COUNTER+8)^384
+        clrf (_COUNTER+9)^384
+INCCOUNTERIO4:
+        incf ((_COUNTER+9)^384),f
+        skipnz
+        incf ((_COUNTER+8)^384),f
+        movlb 0
 #endasm
 
-
-        }
-        else if(DHTFlagbits.IO4)
-        {
-            TMR0=0;
-            DHT22IOCBF();
         }
     }
-
-//  DealWithIOCBF();
-
  }
 
+asm ("SKIPIOC:");   // fast lane to skip IOC
 
-// Timer 1 ms
+// this is the second test to remove glitch
+// timer 1 use by R/C Servo
+
+    if(TMR1IE)
+    if(TMR1IF)
+{
+    TMR1IF=0;
+    if(ServoIndex<5)
+    {
+      //PORTB &= ServoMask
+#asm
+        movf _ServoMask,w
+        andwf _PORTB,f
+#endasm
+    }
+    else
+    {
+      // PORTA &= ServoMask
+#asm
+        movf _ServoMask,w
+        andwf _PORTA,f
+#endasm
+    }
+    TMR1ON=0;
+  }
+
+
+
+// Timer 2 clock system
 if(TMR2IF){
  TMR2IF=0;
  if(TimerSecFlag)
  {
+     ResetCounterFlag=1;
+     //Tell system to Transfer/reset counter
+     IOCounterReset.Byte = IOCounterFlag.Byte;
 
+/*
+     if(IOCounterFlag.IO0)
+     {
 
-    if(IOCounterFlagbits.IO0)
+#asm
+        banksel(_IOSensorData)
+        movf (_COUNTER+0)^384,w
+        movwf (_IOSensorData+4+ARRAY0)^384
+        movf (_COUNTER+1)^384,w
+        movwf (_IOSensorData+5+ARRAY0+1)^384
+        clrf (_COUNTER+0)^384
+        clrf (_COUNTER+1)^384
+
+#endasm
+
+    }
+
+     if(IOCounterFlag.IO1)
      {
-         IOSensorData[0].WORD[2]=COUNTER0;
-         COUNTER0=0;
-     }
-     if(IOCounterFlagbits.IO1)
-     {
-         IOSensorData[1].WORD[2]=COUNTER1;
-         COUNTER1=0;
-     }
-     if(IOCounterFlagbits.IO2)
-     {
-         IOSensorData[2].WORD[2]=COUNTER2;
-         COUNTER2=0;
-     }
-     if(IOCounterFlagbits.IO3)
-     {
-         IOSensorData[3].WORD[2]=COUNTER3;
-         COUNTER3=0;
-     }
-     if(IOCounterFlagbits.IO4)
-     {
-         IOSensorData[4].WORD[2]=COUNTER4;
-         COUNTER4=0;
+
+#asm
+        banksel(_IOSensorData)
+        movf (_COUNTER+2)^384,w
+        movwf (_IOSensorData+4+ARRAY1)^384
+        movf (_COUNTER+3)^384,w
+        movwf (_IOSensorData+5+ARRAY1)^384
+        clrf (_COUNTER+2)^384
+        clrf (_COUNTER+3)^384
+
+#endasm
      }
 
+    if(IOCounterFlag.IO2)
+     {
 
-     TimerSecFlag=0;
+#asm
+        banksel(_IOSensorData)
+        movf (_COUNTER+4)^384,w
+        movwf (_IOSensorData+4+ARRAY2)^384
+        movf (_COUNTER+5)^384,w
+        movwf (_IOSensorData+5+ARRAY2)^384
+        clrf (_COUNTER+4)^384
+        clrf (_COUNTER+5)^384
+
+#endasm
+     }
+
+    if(IOCounterFlag.IO3)
+     {
+
+#asm
+        banksel(_IOSensorData)
+        movf (_COUNTER+6)^384,w
+        movwf (_IOSensorData+4+ARRAY3)^384
+        movf (_COUNTER+7)^384,w
+        movwf (_IOSensorData+5+ARRAY3)^384
+        clrf (_COUNTER+6)^384
+        clrf (_COUNTER+7)^384
+
+#endasm
+     }
+
+    if(IOCounterFlag.IO4)
+     {
+
+#asm
+        banksel(_IOSensorData)
+        movf (_COUNTER+8)^384,w
+        movwf (_IOSensorData+4+ARRAY4)^384
+        movf (_COUNTER+9)^384,w
+        movwf (_IOSensorData+5+ARRAY4)^384
+        clrf (_COUNTER+8)^384
+        clrf (_COUNTER+9)^384
+
+#endasm
+     }
+*/
+
+#asm
+     // need to set bank since we play with it in assembly
+     // TimerSecFlag is a bit so need to dive by 8
+     // banksel should be 0 anyway but just in case
+     banksel(_TimerSecFlag/8)
+#endasm
+  TimerSecFlag=0;
  }
 
  Timerms++;
@@ -926,7 +1047,12 @@ if(TMR2IF){
      PrimaryTimerms=TIMER_100MS;
     if(WaitForEndDeciSecond)
     {
-        _TMR0=TMR0;
+//        _TMR0=TMR0;
+#asm
+       movf _TMR0,w
+       movwf __TMR0
+#endasm
+
         CPSON=0;
         TMR0IE=0;
         WaitForEndDeciSecond=0;
@@ -945,15 +1071,17 @@ if(TMR2IF){
      TimerDeciSec--;
      if(TimerDeciSec==0)
      {
-         TimerDeciSec=10;
+//         TimerDeciSec=10;
+#asm
+         movlw 10
+         movwf _TimerDeciSec
+#endasm
          TimerSecFlag=1;
      }
 
 
   }
 }
-
-
 
     // check serial transmit Interrupt
 if(TXIE)
@@ -963,7 +1091,11 @@ if(TXIE)
     if(InFiFo != OutFiFo)
       {
         TXREG= SerialBuffer[OutFiFo];
-        OutFiFo++;
+//        OutFiFo++;
+#asm
+       movlb 0 ; select bank0
+       incf _OutFiFo
+#endasm
        if(OutFiFo >= SERIAL_BUFFER_SIZE)
          OutFiFo=0;
       }
@@ -975,15 +1107,6 @@ if(TXIE)
      }
   }
 
-// check serial  receive
-if(RCIE)
- if(RCIF)
-   {
-     RcvSerialBuffer[RcvInFiFo++]= RCREG;
- //    RCREG = RcvSerialBuffer[RcvInFiFo++]
-     if(RcvInFiFo == SERIAL_BUFFER_SIZE)
-        RcvInFiFo=0;
-   }
 
 
   if(TMR0IE)
@@ -992,21 +1115,49 @@ if(RCIE)
       TMR0IF=0;
       if(Timer0Overflow)
       {
-          _TMR0_MSB++;
+//          _TMR0_MSB++;
+#asm
+          banksel(__TMR0_MSB)
+          incf __TMR0_MSB,f
+          skipz
+          incf __TMR0_MSB+1,f
+#endasm
       }
       else
       {
      // got timer0 time out
-    TMR0IE=0;
-    CurrentIOStatus=IO_STATUS_BAD;
-    CurrentIOCycle=IO_CYCLE_END;
+       TMR0IE=0;
+//        CurrentIOCycle=IO_CYCLE_DHT_ANALYZE;
+#asm
+       movlw IO_CYCLE_DHT_ANALYZE
+       banksel(_CurrentIOCycle)
+       movwf _CurrentIOCycle        
+#endasm
       }
   }
-
+    // check serial  receive
+if(RCIE)
+ if(RCIF)
+   {
+//     RcvSerialBuffer[RcvInFiFo++]= RCREG;
+#asm
+     banksel(_RcvInFiFo)
+     movf _RcvInFiFo,w
+     incf _RcvInFiFo,f
+     addlw  low (_RcvSerialBuffer)
+     movwf 6
+     movlw high _RcvSerialBuffer
+     movwf 7
+     movlb 3  ; select bank 3
+     movf 0x19 ,w
+     movwf 1
+     banksel(_RcvInFiFo)
+#endasm
+     if(RcvInFiFo == SERIAL_BUFFER_SIZE)
+        RcvInFiFo=0;
+   }
+  
 }
-
-
-
 
 void putch(char char_out)
 {
@@ -1030,6 +1181,174 @@ InFiFo= temp;
  TXIE=1;
 }
 
+// summing the 32 bit counter into irq will reduce irq timing
+// instead we increment  8 bot  ICOUNTER and we will
+// sum ICOUNTER into the 32 bits and reset ICOUNTER
+// P.S. we need to disable interrupts, load ICOUNTER, reset ICOUNTER,
+// enable interrupt and add it into 32 bits IOSEnsorData.dword
+//
+// P.S.  MODBUS IS BIG ENDIAN
+
+
+void  DoSumAllCounter()
+{
+    di();
+     if(IOCounterReset.IO0)
+     {
+#asm
+        bcf _IOCounterReset,3
+        banksel(_IOSensorData)
+        movf (_COUNTER+0)^384,w
+        movwf (_IOSensorData+4+ARRAY0)^384
+        movf (_COUNTER+1)^384,w
+        movwf (_IOSensorData+5+ARRAY0+1)^384
+        clrf (_COUNTER+0)^384
+        clrf (_COUNTER+1)^384
+
+#endasm
+
+    }
+    ei();
+    di();
+     if(IOCounterReset.IO1)
+     {
+
+#asm
+        bcf _IOCounterReset,4
+        banksel(_IOSensorData)
+        movf (_COUNTER+2)^384,w
+        movwf (_IOSensorData+4+ARRAY1)^384
+        movf (_COUNTER+3)^384,w
+        movwf (_IOSensorData+5+ARRAY1)^384
+        clrf (_COUNTER+2)^384
+        clrf (_COUNTER+3)^384
+
+#endasm
+     }
+    ei();
+    di();
+    if(IOCounterReset.IO2)
+     {
+
+#asm
+        bcf _IOCounterReset,5
+        banksel(_IOSensorData)
+        movf (_COUNTER+4)^384,w
+        movwf (_IOSensorData+4+ARRAY2)^384
+        movf (_COUNTER+5)^384,w
+        movwf (_IOSensorData+5+ARRAY2)^384
+        clrf (_COUNTER+4)^384
+        clrf (_COUNTER+5)^384
+
+#endasm
+     }
+    ei();
+    di();
+
+    if(IOCounterReset.IO3)
+     {
+
+#asm
+        bcf _IOCounterReset,6
+        banksel(_IOSensorData)
+        movf (_COUNTER+6)^384,w
+        movwf (_IOSensorData+4+ARRAY3)^384
+        movf (_COUNTER+7)^384,w
+        movwf (_IOSensorData+5+ARRAY3)^384
+        clrf (_COUNTER+6)^384
+        clrf (_COUNTER+7)^384
+
+#endasm
+     }
+    di();
+    ei();
+
+    if(IOCounterReset.IO4)
+     {
+
+#asm
+        bcf _IOCounterReset,7
+        banksel(_IOSensorData)
+        movf (_COUNTER+8)^384,w
+        movwf (_IOSensorData+4+ARRAY4)^384
+        movf (_COUNTER+9)^384,w
+        movwf (_IOSensorData+5+ARRAY4)^384
+        clrf (_COUNTER+8)^384
+        clrf (_COUNTER+9)^384
+
+#endasm
+     }
+    ei();
+
+
+
+#asm
+    banksel(_IOSensorData)
+    // disable interrupt
+    bcf 11,7
+    // load ICOUNTER
+    movf (_ICOUNTER)^384,w
+    // reset ICOUNTER
+    clrf (_ICOUNTER)^384
+    // enable interrupt
+    bsf 11,7
+    // finally add ICOUNTER into ioSensorData BIG ENDIAN mode
+    addwf ((_IOSensorData+ARRAY0+3)^384),f
+    movlw 0
+    addwfc ((_IOSensorData+ARRAY0+2)^384),f
+    addwfc ((_IOSensorData+ARRAY0+1)^384),f
+    addwfc ((_IOSensorData+ARRAY0)^384),f
+
+    //  IO1  COUNTER
+
+    bcf 11,7
+    movf (_ICOUNTER+1)^384,w
+    clrf (_ICOUNTER+1)^384
+    bsf 11,7
+    addwf ((_IOSensorData+ARRAY1+3)^384),f
+    movlw 0
+    addwfc ((_IOSensorData+ARRAY1+2)^384),f
+    addwfc ((_IOSensorData+ARRAY1+1)^384),f
+    addwfc ((_IOSensorData+ARRAY1)^384),f
+
+    //  IO2  COUNTER
+
+    bcf 11,7
+    movf (_ICOUNTER+2)^384,w
+    clrf (_ICOUNTER+2)^384
+    bsf 11,7
+    addwf ((_IOSensorData+ARRAY2+3)^384),f
+    movlw 0
+    addwfc ((_IOSensorData+ARRAY2+2)^384),f
+    addwfc ((_IOSensorData+ARRAY2+1)^384),f
+    addwfc ((_IOSensorData+ARRAY2)^384),f
+
+    //  IO3  COUNTER
+
+    bcf 11,7
+    movf (_ICOUNTER+3)^384,w
+    clrf (_ICOUNTER+3)^384
+    bsf 11,7
+    addwf ((_IOSensorData+ARRAY3+3)^384),f
+    movlw 0
+    addwfc ((_IOSensorData+ARRAY3+2)^384),f
+    addwfc ((_IOSensorData+ARRAY3+1)^384),f
+    addwfc ((_IOSensorData+ARRAY3)^384),f
+
+    //  IO4  COUNTER
+
+    bcf 11,7
+    movf (_ICOUNTER+4)^384,w
+    clrf (_ICOUNTER+4)^384
+    bsf 11,7
+    addwf ((_IOSensorData+ARRAY4+3)^384),f
+    movlw 0
+    addwfc ((_IOSensorData+ARRAY4+2)^384),f
+    addwfc ((_IOSensorData+ARRAY4+1)^384),f
+    addwfc ((_IOSensorData+ARRAY4)^384),f
+    banksel(0)
+#endasm
+}
 
 
 
@@ -1041,7 +1360,10 @@ unsigned char  RcvGetBufferLength(void)
    temp += RcvInFiFo;
    temp -= RcvOutFiFo;
 
-   return (temp % SERIAL_BUFFER_SIZE);
+   if(temp >= SERIAL_BUFFER_SIZE)
+       temp-= SERIAL_BUFFER_SIZE;
+   return temp;
+
 }
 
 void RcvClear(void)
@@ -1141,9 +1463,9 @@ void SendReadFrame(unsigned  short value)
 
 void SendBytesFrame(unsigned char _Address)
 {
-  unsigned char loop;
+  unsigned char loop=0;
   unsigned char NByte=0;
-
+ 
   unsigned char _temp;
 
   _temp = Setting.IOConfig[_Address];
@@ -1164,16 +1486,50 @@ void SendBytesFrame(unsigned char _Address)
     else
      {
        InitModbusPacket();
+
        ModbusPacketBuffer[2]= NByte;
+//  counter use interrupt
+//  we need to transfer data with interrupt disable
+// use FSR0 = IOSensor[_Address]
+// and FSR1 = _modbusPacketBuffer[3]
+// IOSensorData =0x1A0
+//
+//       di()
+//              for(loop=0;loop<NByte;loop++)
+//        {
+//          _temp= tSensor.BYTE[loop];
+//          ModbusPacketBuffer[3+loop]=_temp;
+//        }
+//       ei()
 
+       _temp = _Address * sizeof(SensorDataUnion);
+       #asm
+       movlw _IOSensorData/256
+       movwf FSR0H
+       movlw _IOSensorData&0xff
+       addwf SendBytesFrame@_temp,w
+       movwf FSR0L
+       movlw _ModbusPacketBuffer/256
+       movwf FSR1H
+       movlw (_ModbusPacketBuffer&0xff)+3
+       movwf FSR1L
+       movf SendBytesFrame@NByte,w
+       movwf SendBytesFrame@loop
+#endasm
+      // ok move NBytes without interrupt
+       di();
+#asm
+BYTELOOP:
+        movf  INDF0,w
+        movwi FSR1++
+        incf FSR0L,f
+        decfsz SendBytesFrame@loop,f
+        goto BYTELOOP
+#endasm
+         ei();
 
-       for(loop=0;loop<NByte;loop++)
-        {
-          _temp= IOSensorData[_Address].BYTE[loop];
-          ModbusPacketBuffer[3+loop]=_temp;
-        }
        SendModbusPacket(NByte+3);
-     }   
+     }
 }
 
 
@@ -1411,14 +1767,20 @@ void ForceSingleCoil()
   // Address 0x0: Set RCServo0 and clear counter accumulator
   // Address 0x1: Set RCServo1 and clear counter accumulator
   // Address 160: Slave Address
+  // Address 0x1ff:  if value is 0x5678 Enable Change in  configuration
   // Address 0xAA55: if value is 0x1234 this mean reset
 
 void PresetSingleRegister()
 {
   unsigned char oldConfig;
   unsigned char temp;
-  if(ModbusAddress == 0xAA55)
+  if(ModbusAddress == 0x1ff)
   {
+      EnableConfigChange= (ModbusData == 0x5678);
+  }
+  else if(ModbusAddress == 0xAA55)
+  {
+
       if(ModbusData == 0x1234)
       {
         ForceReset=1;
@@ -1430,8 +1792,10 @@ void PresetSingleRegister()
       else
          SendFrameError(ILLEGAL_DATA_ADDRESS);
   }
-    if((ModbusAddress >=0x100) && (ModbusAddress <= 0x109))
+  else if((ModbusAddress >=0x100) && (ModbusAddress <= 0x109))
     {
+      if(EnableConfigChange)
+      {
       temp = ModbusAddress - 0x100;
       BadIO=0;
       oldConfig=Setting.IOConfig[temp];
@@ -1448,6 +1812,10 @@ void PresetSingleRegister()
           SendPresetFrame();
           SaveSetting();
         }
+      EnableConfigChange=1;
+      }
+      else
+          SendPresetFrame();
     }
     else if(ModbusAddress <10)
     {
@@ -1466,8 +1834,11 @@ void PresetSingleRegister()
     }
    else if(ModbusAddress == 160)
     {
+       if(EnableConfigChange)
+       {
       Setting.SlaveAddress=ModbusData;
       SaveSetting();
+       }
       SendPresetFrame();
     }
     else
@@ -1563,11 +1934,21 @@ void ExecuteCommand(void)
  BRGH =0; //8mhz =>1;
  BRG16 = 1;
  SYNC =0;
-
-
  SPBRGL = 207; // assume 32Mhz clock
  SPBRGH =0;
+#elif BAUD == 19200
+  BRGH =0;
+ BRG16 = 1;
+ SYNC =0;
 
+ SPBRGL = 103;
+ SPBRGH = 0;
+
+#elif BAUD == 38400
+ BRGH = 1;
+ BRG16=1;
+ SYNC =0;
+ SPBRG = 208;
 #elif BAUD == 115200
  // assume  baud 115200
  BRGH =1;
@@ -1616,7 +1997,7 @@ void ExecuteCommand(void)
  IOCIE = 1; // enable interrupt on change
 
 
-IOCounterFlag=DHTFlag=0;
+IOCounterFlag.Byte=DHTFlag=0;
 
 ModbusOnTransmit=0;
 
@@ -1625,8 +2006,11 @@ ModbusOnTransmit=0;
 
  // prepare IO pin
  for(loop=0;loop<INPUT_COUNT;loop++)
+ {
+    EnableConfigChange=1; // enable IOCONFIG CHANGE
  SetIOConfig(loop);
- 
+ }
+ EnableConfigChange=0;
 
  // timer 4 use for pwm
  T4CON = 0b00000111;  // 1:16 timer4 ON
@@ -1649,7 +2033,6 @@ ModbusOnTransmit=0;
       ServoTimer[loop]=0;
 
 // timer 1
-  
    ServoIndex=INPUT_COUNT;
     // assume 32Mhz clock
    T1CON = 0b00110000;  // fsoc/4/8  (1Mhz timer clock
@@ -1658,7 +2041,7 @@ ModbusOnTransmit=0;
    TMR1IE=0;
    TMR1ON=0;
 
-  
+
 
 
 
@@ -1715,6 +2098,8 @@ ModbusOnTransmit=0;
 
      DoIOCycle();
      DoRCServo();
+     DoSumAllCounter();
+
  }
 
 }

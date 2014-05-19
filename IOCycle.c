@@ -20,10 +20,20 @@ near ConfigUnion CurrentIOSensor;
 near unsigned char CurrentIOPin;
 near unsigned char CurrentIOCycle;
 
+
+
 SensorDataUnion  IOSensorData[INPUT_COUNT] @ 0x1A0;
 SensorDataUnion  WorkingSensorData;
 
+// Counter will be on same bank
+// than IOSensor data (bank 3)
+// IOSensor is 10 data of 6 BYTE
+// to speed up interrupt
+// counter are alternating between COUNTER & ALT_COUNT
 
+// ICOUNTER is use by interrupt to speed it up
+unsigned char ICOUNTER[5] @ 0x1E0;
+unsigned short COUNTER[5] @ 0x1E6;
 
 
 volatile unsigned char _TMR0;
@@ -31,23 +41,16 @@ volatile unsigned short _TMR0_MSB;
 volatile unsigned char BitCount;
 volatile unsigned char WorkingByte;
 volatile unsigned char CSum;
-volatile unsigned char WorkingCount;
 volatile unsigned  char ByteIndex;
-volatile unsigned char PreBitCount;
 bit      Timer0Overflow;
 bit      TimerSecFlag;
+bit      ResetCounterFlag;
 near volatile unsigned char    DHTFlag           @ 0x070;
-near volatile unsigned char    IOCounterFlag     @ 0x071;
+near volatile  IOBits_t    IOCounterFlag     @ 0x071;
+near volatile IOBits_t IOCounterReset @ 0x072;
 
-// Counter will be on same bank
-// than IOSensor data (bank 3)
-// IOSensor is 10 data of 6 BYTE
+near unsigned char Retry=0;
 
-unsigned short COUNTER0 @ 0x1E6;
-unsigned short COUNTER1 @ 0x1E8;
-unsigned short COUNTER2 @ 0x1EA;
-unsigned short COUNTER3 @ 0x1Ec;
-unsigned short COUNTER4 @ 0x1EE;
 
 
 void DealWithError(void)
@@ -63,6 +66,8 @@ void DealWithError(void)
 void ScanNextIOPin(void)
 {
   unsigned char loop;
+
+  Retry=0;
   CurrentIOPin++;
 
   if(CurrentIOPin >= INPUT_COUNT)
@@ -266,17 +271,30 @@ void WriteIO(unsigned char Pin,unsigned char value)
 
 void SetIOChange(unsigned char Pin, unsigned char value)
 {
+    unsigned char _temp;
     if(Pin<5)
         if(value==0)
         {
+            _temp = NOT_IOMASK[Pin];
             di();
-            IOCBN&= NOT_IOMASK[Pin];
+//          IOCBN&= _temp;
+#asm
+            movf SetIOChange@_temp,w
+            movlb 7
+            andwf _IOCBN&0x7F,f
+#endasm
             ei();
         }
          else
          {
+            _temp= IOMASK[Pin];
             di();
-            IOCBN|= IOMASK[Pin];
+//            IOCBN|= _temp;
+#asm
+            movf SetIOChange@_temp,w
+            movlb 7
+            iorwf _IOCBN&0x7f,f
+#endasm
             ei();
          }
 }

@@ -53,7 +53,9 @@ void  DS18B20Reset()
 
     SetOutputMode(CurrentIOPin);
     WriteIO(CurrentIOPin,0);
-    SetTimer6Delay8us(60);
+    // reset for >480 < 960 us
+    // so it will be ~500us = 504
+    SetTimer6Delay8us(63);
 }
 
 
@@ -65,15 +67,18 @@ unsigned char DS18B20ResetCheckForDevice()
 
     SetInputMode(CurrentIOPin);
 
-   // delay of 60us
-   SetTimer6Delay500ns(120);
+   // delay of 60us by ds18b20 follow by presence (60..240us)
+   // so let's check for 90 us
+   SetTimer6Delay500ns(180);
    while(!TMR6IF);
 
    NodeviceFound=ReadIOPin(CurrentIOPin);
     if(NodeviceFound)
        return( 0);
-    // 480 us delay
-    SetTimer6Delay8us(60);
+
+    // need a minimum of 480 us after reset pulse
+    // than we will put 500us-90us(presence detection) = 410 (408)
+    SetTimer6Delay8us(51);
        return(1);
 }    
      
@@ -91,22 +96,42 @@ unsigned char DS18B20Read()
      WriteIO(CurrentIOPin,0);
  
      GIE=0;
-    SetTimer6Delay500ns(2);
-     while(!TMR6IF);
 
-     // delay 2us
-     //__delay_us(1);
+ // delay 0.75 us the return from write io and set inputmode should do the time
+#asm
+     nop
+     nop
+     nop
+     nop
+     nop
+     nop
+     nop
+     nop
+ #endasm
 
      SetInputMode(CurrentIOPin);
 
-     // __delay_us(3);
-   SetTimer6Delay500ns(2);
+#asm
+     nop
+     nop
+     nop
+     nop
+     nop
+     nop
+     nop
+     nop
+#endasm
+   // delay 2us
+   SetTimer6Delay500ns(1);
    while(!TMR6IF);
-
    if(ReadIOPin(CurrentIOPin)>0)
-          result |= mask;
+   {
+       GIE=1;
+       result |= mask;
+   }
+   else
    GIE=1;
-      // delay 60us
+      // delay 60-1-5 = 54 us
      SetTimer6Delay500ns(120);
      while(!TMR6IF);
      mask <<=1;
@@ -126,8 +151,12 @@ void DS18B20Write(unsigned char value)
   
      if(value & mask)
      {
-       SetTimer6Delay500ns(2);
-       while(!TMR6IF);
+//       SetTimer6Delay500ns(2);
+//       while(!TMR6IF);
+#asm
+       nop
+       nop
+#endasm
        GIE=1;
      }
      else
@@ -167,7 +196,7 @@ void DoDS18B20Cycle(void)
     case IO_CYCLE_DS18B20_RESET2:
                          DS18B20Reset();
                          break;
-    case IO_CYCLE_DS18B20_RESET_WAIT:  //wait ~480us
+    case IO_CYCLE_DS18B20_RESET_WAIT:  //wait ~500us
     case IO_CYCLE_DS18B20_RESET2_WAIT:
       case IO_CYCLE_DS18B20_RESET_WAIT2:
       case IO_CYCLE_DS18B20_RESET2_WAIT2:

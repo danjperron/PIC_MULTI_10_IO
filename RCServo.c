@@ -13,11 +13,11 @@
 unsigned char ServoIndex;
 unsigned short ServoTimer[INPUT_COUNT];
 short ServoIdleTime=16000;
-
-
+near unsigned char ServoMask;
 
 void DoRCServo(void)
 {
+    unsigned char BMask;
     short _temp;
 
     if(!TMR1ON)
@@ -26,9 +26,9 @@ void DoRCServo(void)
     if(ServoIndex>INPUT_COUNT)
     {
        ServoIndex=0;
-       ServoIdleTime=16000;
+       ServoIdleTime=20000;
     }
-
+        ServoMask=NOT_IOMASK[ServoIndex];
         if(ServoIndex==INPUT_COUNT)
         {
             if(ServoIdleTime<0)
@@ -46,20 +46,28 @@ void DoRCServo(void)
 
          TMR1IF=0;
          TMR1IE=1;
-         TMR1ON=1;
+     BMask = IOMASK[ServoIndex];
      if(ServoIndex<5)
     {
+
         di();
-        PORTB |= IOMASK[ServoIndex];
-        ei();
+//        PORTB |= BMask;
+#asm
+        movf DoRCServo@BMask,w
+        iorwf 13,f
+#endasm
     }
     else
     {
         di();
-        PORTA |= IOMASK[ServoIndex];
-        ei();
+//        PORTA |= BMask;
+#asm
+        movf DoRCServo@BMask,w
+        iorwf 12,f
+#endasm
     }
-
+    TMR1ON=1;
+    ei();
     }
 
 }
