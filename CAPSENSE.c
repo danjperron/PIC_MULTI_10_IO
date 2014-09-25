@@ -54,13 +54,11 @@ void  CAPSENSECycleIdle(void)
 
 void DoCAPSENSECycle(void)
 {
-  switch(CurrentIOCycle)
-  {
- 
-    case IO_CYCLE_IDLE:
-                          CAPSENSECycleIdle();
-                          break;
-         case IO_CYCLE_START: if(GotCapSenseFlag)
+    if(CurrentIOCycle==IO_CYCLE_IDLE)
+        CAPSENSECycleIdle();
+    else if(CurrentIOCycle==IO_CYCLE_START)
+    {
+        if(GotCapSenseFlag)
                          {
                            
                           WorkingSensorData.BYTE[0]=0;
@@ -74,9 +72,7 @@ void DoCAPSENSECycle(void)
                           CPSON=0;
                           TMR0CS=0;
                           TMR0IE=0;
-
                          }
-                         break;
-  }
+    }
 
 }

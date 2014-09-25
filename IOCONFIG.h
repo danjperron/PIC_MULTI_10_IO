@@ -56,17 +56,17 @@ extern const unsigned char CSMASK[10];
 #define IO0_PULLUP WPUBbits.WPUB3
 
 
-#define IO1 RB4
-#define IO1_TRIS  TRISBbits.TRISB4
-#define IO1_ANSEL ANSELBbits.ANSB4
-#define IO1_AN_CHANNEL 8
-#define IO1_PULLUP WPUBbits.WPUB4
+#define IO1 RB1
+#define IO1_TRIS  TRISBbits.TRISB1
+#define IO1_ANSEL ANSELBbits.ANSB1
+#define IO1_AN_CHANNEL 11
+#define IO1_PULLUP WPUBbits.WPUB1
 
-#define IO2 RB5
-#define IO2_TRIS  TRISBbits.TRISB5
-#define IO2_ANSEL ANSELBbits.ANSB5
-#define IO2_AN_CHANNEL 7
-#define IO2_PULLUP WPUBbits.WPUB6
+#define IO2 RB4
+#define IO2_TRIS  TRISBbits.TRISB4
+#define IO2_ANSEL ANSELBbits.ANSB4
+#define IO2_AN_CHANNEL 8
+#define IO2_PULLUP WPUBbits.WPUB4
 
 #define IO3 RB6
 #define IO3_TRIS  TRISBbits.TRISB6

@@ -14,7 +14,6 @@ unsigned char ServoIndex;
 unsigned short ServoTimer[INPUT_COUNT];
 short ServoIdleTime=16000;
 near unsigned char ServoMask;
-
 void DoRCServo(void)
 {
     unsigned char BMask;
@@ -28,7 +27,15 @@ void DoRCServo(void)
        ServoIndex=0;
        ServoIdleTime=20000;
     }
+//     if(Setting.IOConfig[CurrentIOPin]!=IOCONFIG_SERVO)
+//     {
+//         ServoMask=0xff;
+//         return;
+//    }
+     
+
         ServoMask=NOT_IOMASK[ServoIndex];
+
         if(ServoIndex==INPUT_COUNT)
         {
             if(ServoIdleTime<0)

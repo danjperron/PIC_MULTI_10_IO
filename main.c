@@ -141,7 +141,7 @@
 
 
 #define SOFTWARE_ID      0x653A
-#define RELEASE_VERSION 0x0100
+#define RELEASE_VERSION 0x0101
 
 ///////////////////  How to program the IC.
 //
@@ -187,11 +187,11 @@
  *     RA6    CRYSTAL CLOCK
  *     RA7    CRYSTAL CLOCK
  *     RB0    RS-485 DIRECTION
- *     RB1    SERIAL IN
- *     RB2    SERIAL OUT
+ * IO1 RB1
+ *     RB2    SERIAL IN
  * IO0 RB3
- * IO1 RB4
- * IO2 RB5
+ * IO2 RB4
+ *     RB5    SERIAL OUT
  * IO3 RB6
  * IO4 RB7
  *
@@ -281,19 +281,19 @@ char RcvSerialBuffer[SERIAL_BUFFER_SIZE];
 unsigned char SerialSum;    // use for check sum
 unsigned char RcvSerialSum;  // use for check sum verification
 bit ModbusOnTransmit;
-bit ForceReset;
 bit EnableConfigChange;
+bit ForceReset;
 char ModbusPacketBuffer[SERIAL_BUFFER_SIZE] @ 0x220;
 
 
-const unsigned char     IOMASK[11]={0b00001000,0b00010000,0b00100000,0b01000000,0b10000000,\
+const unsigned char     IOMASK[11]={0b00001000,0b00000010,0b00010000,0b01000000,0b10000000,\
                                     0b00000001,0b00000010,0b00000100,0b00001000,0b00010000,0};
 
-const unsigned char NOT_IOMASK[11]={0b11110111,0b11101111,0b11011111,0b10111111,0b01111111,\
+const unsigned char NOT_IOMASK[11]={0b11110111,0b11111101,0b11101111,0b10111111,0b01111111,\
                                     0b11111110,0b11111101,0b11111011,0b11110111,0b11101111,0b11111111};
 
 //cap sense mask
-const unsigned char CSMASK[10]={0b00001001,0b00001000,0b00000111,0b00000101,0b00000110,\
+const unsigned char CSMASK[10]={0b00001001,0b00001011,0b00001000,0b00000101,0b00000110,\
                                 0b00000000,0b00000001,0b00000010,0b00000011,0b00000100};
 
 // MODBUS
@@ -337,16 +337,7 @@ Timer4  Hardware PWM
   
 
 
-// EEPROM LOAD AND SAVE SETTING
 
-void LoadSetting(void)
-{
-  unsigned char  idx;
-  unsigned char  * pointer = (unsigned char *) &Setting;
-
-  for(idx=0; idx < sizeof(Setting);idx++)
-     *(pointer++) = eeprom_read(idx);
-}
 
 void SaveSetting(void)
 {
@@ -359,39 +350,10 @@ void SaveSetting(void)
 
 
 
-void Init1msTimer()
-{
-// TIMER2
-// 16Mhz clock / 4 =  250 ns clock
-// 250ns * 8  = 2us clock
-//  1000us / 2us = 250
 
 
-     // assume 32Mhz
-   T2CON= 0b00000111;
-   PR2=125;
 
 
- TMR2=0;
- // Enable IRQ
-TMR2IF=0;
-PrimaryTimerms=100;
-TimerDeciSec=10;
-TMR2IE=1;
-PEIE = 1;
-GIE=1;
-}
-
-void InitA2D()
-{
-ADCON1 =  0b11100011;  // fosc/64  32Mhz
-ADCON0= 0b00000001; // enable a/d
-ANSELA = 0b0000000;      // NO ANALOG
-ANSELB = 0b0000000;
-ADIE=0;
-ADIF=0;
-FVRCON=0b11000010;  // Vref internal 2.048V on ADC
-}
 
 void SetAnalogConfig(unsigned char Pin)
 {
@@ -432,19 +394,66 @@ void SetOutputConfig(unsigned char Pin)
  unsigned char _tmp= NOT_IOMASK[Pin];
  if(Pin<5)
  {
-     PORTB &= _tmp;
-     TRISB &= _tmp;
-     ANSELB &= _tmp;
+#asm
+     movf  SetOutputConfig@_tmp,w
+     movwf ??_SetOutputConfig
+     movf  ??_SetOutputConfig,w
+     movlb 0
+     andwf 13,f
+     movlb 1
+     andwf 13,f
+     movlb 3
+     andwf 13,f
+#endasm
+ //    PORTB &= _tmp;
+ //    TRISB &= _tmp;
+ //    ANSELB &= _tmp;
  }
  else
  {
-     PORTA &= _tmp;
-     TRISA &= _tmp;
-     ANSELA &= _tmp;
+#asm
+     movf  SetOutputConfig@_tmp,w
+     movwf ??_SetOutputConfig
+     movf  ??_SetOutputConfig,w
+     movlb 0
+     andwf 12,f
+     movlb 1
+     andwf 12,f
+     movlb 3
+     andwf 12,f
+#endasm
+
+//     PORTA &= _tmp;
+//     TRISA &= _tmp;
+//     ANSELA &= _tmp;
  }
 }
+/*ovf	SetOutputConfig@_tmp,w
+  4553  0016' 0082'              	movwf	??_SetOutputConfig
+  4554  0017' 0802'              	movf	??_SetOutputConfig,w
+  4555  0018' 0020               	movlb	0	; select bank0
+  4556  0019' 058D               	andwf	13,f	;volatile
+  4557                           
+  4558                           ;main.c: 398: TRISB &= _tmp;
+  4559  001A' 0805'              	movf	SetOutputConfig@_tmp,w
+  4560  001B' 0082'              	movwf	??_SetOutputConfig
+  4561  001C' 0802'              	movf	??_SetOutputConfig,w
+  4562  001D' 0021               	movlb	1	; select bank1
+  4563  001E' 058D               	andwf	13,f	;volatile
+  4564                           
+  4565                           ;main.c: 399: ANSELB &= _tmp;
+  4566  001F' 0805'              	movf	SetOutputConfig@_tmp,w
+  4567  0020' 0082'              	movwf	??_SetOutputConfig
+  4568  0021' 0802'              	movf	??_SetOutputConfig,w
+  4569  0022' 0023               	movlb	3	; select bank3
+  4570  0023' 058D               	andwf	13,f	;volatile
 
-
+      //PORTB &= ServoMask
+#asm
+        movf _ServoMask,w
+        andwf _PORTB,f
+#endasm
+*/
 char SetPWMConfig(unsigned char Pin,unsigned short value)
 {
 
@@ -565,7 +574,7 @@ void SetIOConfig(unsigned char Pin)
   }
   ServoTimer[Pin]=0; // disable Servo
 
-  if(ioconfig.Config<5)
+  if(ioconfig.Config<IOCONFIG_INPUT)
   {
       if(Pin<5)
           SetPullUp(Pin,0);
@@ -1398,7 +1407,11 @@ char RcvGetChar(void)
 void TXM_WAIT(void)
 {
     while(TXIE);
+#if BAUD==9600
+    __delay_us(800);
+#else
     __delay_us(200);
+#endif
     TXM_ENABLE=0;
 }
 
@@ -1721,8 +1734,9 @@ void ReadInputStatus()
      else
          _tmp = PORTA;
         _tmp&=IOMASK[ModbusAddress];
-        
-      SendReadByteFrame(_tmp);
+
+
+      SendReadByteFrame(_tmp==0 ? 0 : 1);
 
     }
    else
@@ -1819,15 +1833,21 @@ void PresetSingleRegister()
     }
     else if(ModbusAddress <10)
     {
+        oldConfig= Setting.IOConfig[ModbusAddress];
         if(!SetPWMConfig(ModbusAddress,ModbusData)) // This only works if available
         {
-           if(Setting.IOConfig[ModbusAddress]==IOCONFIG_COUNTER)
+           if(oldConfig==IOCONFIG_COUNTER)
         {
             if(ModbusData==0)
                 IOSensorData[ModbusAddress].DWORD=0;
         }
-        else
-         ServoTimer[ModbusAddress]=ModbusData;
+           else if(oldConfig == IOCONFIG_SERVO)
+              ServoTimer[ModbusAddress]=ModbusData;
+           else 
+           {
+               ForceSingleCoil();
+               return;
+           }
         }
 
         SendPresetFrame();
@@ -1852,9 +1872,11 @@ void ExecuteCommand(void)
   if(ModbusSlave != Setting.SlaveAddress)
      return;    // this is not our Slave Address! just forget it
 
-
-      __delay_us(100);
-
+#if BAUD == 9600
+  __delay_us(400);
+#else
+  __delay_us(100);
+#endif
  // if(ModbusLRC != ModbusCheckSum)
  //     return; // invalide check sum we should deal with it
 
@@ -1913,17 +1935,24 @@ void ExecuteCommand(void)
 
 
  // Load Modbus and IO configuration
+// EEPROM LOAD AND SAVE SETTING
 
- LoadSetting();
+  unsigned char  idx;
+  unsigned char  * pointer = (unsigned char *) &Setting;
+
+  for(idx=0; idx < sizeof(Setting);idx++)
+     *(pointer++) = eeprom_read(idx);
 
 
- TRISA		= 0b00101011;	// RA0,RA1,RA3,RA5 INPUT , RA2,RA4 OUTPUT
+ TRISA		= 0b00111111;	// RA0,RA1,RA3,RA5 INPUT , RA2,RA4 OUTPUT
+ TRISB          = 0b11011110;
  TXM_ENABLE=0;
 
  // set serial com with 57600 baud
 //alternate pin
- APFCON0 = 0b00000000;
- APFCON1 = 0b00000000;
+
+ APFCON0 = 0b10000000;
+ APFCON1 = 0b00000001;
  
     
  TXSTA = 0b10000010;
@@ -2001,8 +2030,35 @@ IOCounterFlag.Byte=DHTFlag=0;
 
 ModbusOnTransmit=0;
 
- Init1msTimer() ;
- InitA2D() ;
+// Init1msTimer() ;
+//void Init1msTimer()
+// TIMER2
+// 16Mhz clock / 4 =  250 ns clock
+// 250ns * 8  = 2us clock
+//  1000us / 2us = 250
+// assume 32Mhz
+T2CON= 0b00000111;
+PR2=125;
+TMR2=0;
+// Enable IRQ
+TMR2IF=0;
+PrimaryTimerms=100;
+TimerDeciSec=10;
+TMR2IE=1;
+PEIE = 1;
+GIE=1;
+
+
+
+// init A/D
+ADCON1 =  0b11100011;  // fosc/64  32Mhz
+ADCON0= 0b00000001; // enable a/d
+ANSELA = 0b0000000;      // NO ANALOG
+ANSELB = 0b0000000;
+ADIE=0;
+ADIF=0;
+FVRCON=0b11000010;  // Vref internal 2.048V on ADC
+
 
  // prepare IO pin
  for(loop=0;loop<INPUT_COUNT;loop++)
@@ -2062,7 +2118,11 @@ ModbusOnTransmit=0;
      {
          if(!TXIE)
          {
+#if BAUD == 9600
+             __delay_us(800);
+#else
              __delay_us(200);
+#endif
              TXM_ENABLE=0;
              ModbusOnTransmit=0;
          }
