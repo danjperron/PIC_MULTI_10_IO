@@ -27,7 +27,7 @@ Multi-Purpose RS-485 with Modbus Protocol using a small cpu PIC16F1827
 
   The binary file
 
-    - Pic_Multi_10.hex   Compile code in hex format.
+    - FirmwareV1.01_57600Baud.hex   Compile code in hex format.
 
 
   Add-on file for Raspberry Pi
