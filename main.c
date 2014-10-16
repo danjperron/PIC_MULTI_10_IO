@@ -248,7 +248,9 @@
 
 //Set default value
 //  IO0..IO9 config , modbus address
-__EEPROM_DATA(IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT);
+//__EEPROM_DATA(IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT);
+  __EEPROM_DATA(IOCONFIG_OUTPUT,IOCONFIG_OUTPUT,IOCONFIG_OUTPUT,IOCONFIG_OUTPUT,IOCONFIG_OUTPUT,IOCONFIG_OUTPUT,IOCONFIG_OUTPUT,IOCONFIG_OUTPUT);
+
 __EEPROM_DATA(IOCONFIG_INPUT,IOCONFIG_INPUT,127,0xff,0xff,0xff,0xff,0xff);
 
 
@@ -1421,6 +1423,9 @@ void SendModbusPacket(int BufferSize)
 {
     unsigned short CRC;
     unsigned char loop;
+
+    if(ModbusSlave==0) return;
+
     CRC = CRC16(ModbusPacketBuffer,BufferSize);
     //RS-485 on TRANSMISSION
     ModbusOnTransmit=1;
@@ -1452,7 +1457,7 @@ void  SendFrameError(unsigned char ErrorCode)
 
 
 
-
+/*
 void SendReadByteFrame(unsigned  char value)
 {
 
@@ -1461,13 +1466,70 @@ void SendReadByteFrame(unsigned  char value)
    ModbusPacketBuffer[3]= value;
    SendModbusPacket(4);
  }
+*/
 
+void SendReadByteFrame(unsigned  char value)
+{
+
+#asm
+    movlb 0
+    movwf SendReadByteFrame@value
+#endasm
+
+
+   InitModbusPacket();
+
+//   ModbusPacketBuffer[2]= 1;  // byte count
+//   ModbusPacketBuffer[3]= value;
+
+#asm
+    movlw 1
+    banksel(_ModbusPacketBuffer)
+    movwf ((_ModbusPacketBuffer&127)+2)
+    movlb 0
+    movf SendReadByteFrame@value,w
+    banksel(_ModbusPacketBuffer)
+    movwf ((_ModbusPacketBuffer&127)+3)
+#endasm
+   SendModbusPacket(4);
+ }
+
+/*
 void SendReadFrame(unsigned  short value)
 {
    InitModbusPacket();
    ModbusPacketBuffer[2]= 2;  // byte count
    ModbusPacketBuffer[3]= value >> 8;
    ModbusPacketBuffer[4]= value & 0xff;
+   SendModbusPacket(5);
+}
+*/
+void SendReadFrame(unsigned  short value)
+{
+
+#asm
+    movlb 0
+    movwf SendReadFrame@value
+#endasm
+   InitModbusPacket();
+
+//   ModbusPacketBuffer[2]= 2;  // byte count
+//   ModbusPacketBuffer[3]= value >> 8;
+//   ModbusPacketBuffer[4]= value & 0xff;
+
+#asm
+   movlw 2
+   banksel(_ModbusPacketBuffer)
+   movwf ((_ModbusPacketBuffer&127)+2)
+   movlb 0
+   movf  SendReadFrame@value+1,w
+   banksel(_ModbusPacketBuffer)
+   movwf ((_ModbusPacketBuffer&127)+3)
+   movlb 0
+   movf  SendReadFrame@value,w
+   banksel(_ModbusPacketBuffer)
+   movwf ((_ModbusPacketBuffer&127)+4)
+#endasm
    SendModbusPacket(5);
 }
 
@@ -1545,7 +1607,7 @@ BYTELOOP:
      }
 }
 
-
+/*
 void SendPresetFrame()
 {
    unsigned char buffer[6];
@@ -1559,9 +1621,105 @@ void SendPresetFrame()
    SendModbusPacket(6);
    
 }
+*/
+void SendPresetFrame()
+{
+      InitModbusPacket();
 
 
 
+
+//   ModbusPacketBuffer[2]= ModbusAddress >> 8;
+//   ModbusPacketBuffer[3]= ModbusAddress & 0xff;
+//   ModbusPacketBuffer[4]= ModbusData >> 8;
+//   ModbusPacketBuffer[5]= ModbusData & 0xff;
+
+   #asm
+   banksel(_ModbusAddress)
+   movf _ModbusAddress+1,w
+   banksel(_ModbusPacketBuffer)
+   movwf ((_ModbusPacketBuffer&127)+2)
+
+   banksel(_ModbusAddress)
+   movf _ModbusAddress,w
+   banksel(_ModbusPacketBuffer)
+   movwf ((_ModbusPacketBuffer&127)+3)
+
+   banksel(_ModbusData)
+   movf _ModbusData+1,w
+   banksel(_ModbusPacketBuffer)
+   movwf ((_ModbusPacketBuffer&127)+4)
+
+   banksel(_ModbusData)
+   movf _ModbusData,w
+   banksel(_ModbusPacketBuffer)
+   movwf ((_ModbusPacketBuffer&127)+5)
+   #endasm
+
+
+   SendModbusPacket(6);
+
+}
+
+
+unsigned char DecodeSerial(char * msg)
+{
+    int loop;
+    unsigned char rcode;
+    unsigned short CalcCRC;
+
+    //unsigned char * pt=msg;
+
+ //   unsigned char * pt=0;
+
+
+//    ModbusSlave= *(pt++);
+//    ModbusFunction= *(pt++);
+    #define ToUSHORT    ((((unsigned short)*pt) << 8 ) | ((unsigned short) pt[1]));pt+=2;
+//    ModbusAddress= ToUSHORT;
+//    ModbusData= ToUSHORT;
+    // MODBUS CRC have LSB FIRST
+//    ModbusCRC= *pt++;
+//    ModbusCRC|= ((unsigned short)(*pt)) << 8;
+
+
+#asm
+    movwf 6
+    clrf 7
+    moviw fsr1++
+    movwf _ModbusSlave
+    moviw fsr1++
+    movwf _ModbusFunction
+    moviw fsr1++
+    movwf _ModbusAddress+1
+    moviw fsr1++
+    movwf _ModbusAddress
+    moviw fsr1++
+    movwf _ModbusData+1
+    moviw fsr1++
+    movwf _ModbusData
+    moviw fsr1++
+    movwf _ModbusCRC
+    moviw fsr1++
+    movwf _ModbusCRC+1
+#endasm
+
+
+
+
+    CalcCRC = CRC16(ModbusBuffer,6);
+
+   if(CalcCRC != ModbusCRC) rcode=0;
+   else if(ModbusSlave==Setting.SlaveAddress) rcode=1;
+   else if(ModbusSlave==0) rcode=1;
+   else rcode=2;
+
+   return rcode;
+
+}
+
+
+/*
 unsigned char DecodeSerial(char * msg)
 {
     int loop;
@@ -1594,7 +1752,7 @@ unsigned char DecodeSerial(char * msg)
 
 }
 
-
+*/
 
 
   // Function 3  Read Holding Register
@@ -1681,6 +1839,32 @@ unsigned char  MultipleRegister(unsigned char _Address)
 }
 
 
+unsigned char GetInputPin(unsigned char thePin)
+{
+    unsigned char _tmp;
+
+    if(thePin < 5)
+       _tmp = PORTB;
+    else
+       _tmp = PORTA;
+    _tmp &= IOMASK[thePin];
+    return (_tmp==0 ? 0 : 1);
+}
+
+unsigned short ReadAllCoils(void)
+{
+    unsigned short stemp=0;
+    unsigned char loop;
+
+    for(loop=0;loop<INPUT_COUNT;loop++)
+        {
+            stemp *=2;
+            stemp |= GetInputPin((INPUT_COUNT -1)-loop);
+        }
+    return stemp;
+}
+
+
   // Function 4  Read Current Register
   //
   // Address 0x1000:  Current VRef 2.048V A/D value
@@ -1710,6 +1894,8 @@ void   ReadCurrentRegister()
            temp = ReadVRef(); // Read 2.048V reference Value
        else if(ModbusAddress==0x1001)
            temp = ReadTSensor(); // Read Build-in Temperature sensor
+       else if(ModbusAddress==0x1002)
+           temp = ReadAllCoils();
        else
            BadIO=1;
         
@@ -1720,7 +1906,7 @@ void   ReadCurrentRegister()
    
 }
 
-
+/*
 void ReadInputStatus()
 {
   // Read Coil ou Read Input Status
@@ -1742,7 +1928,21 @@ void ReadInputStatus()
    else
       SendFrameError( ILLEGAL_DATA_ADDRESS);  
 }
+*/
+void ReadInputStatus()
+{
+  // Read Coil ou Read Input Status
 
+    if(ModbusAddress < INPUT_COUNT)
+    {
+        SendReadByteFrame(GetInputPin(ModbusAddress));
+    }
+
+   else
+      SendFrameError( ILLEGAL_DATA_ADDRESS);
+}
+
+/*
 void ForceSingleCoil()
 {
     unsigned char mask;
@@ -1773,6 +1973,43 @@ void ForceSingleCoil()
     }
     SendFrameError( ILLEGAL_DATA_ADDRESS);
 }
+*/
+
+
+void SetSingleCoil(unsigned char thePin, unsigned char value)
+{
+
+    if(Setting.IOConfig[thePin] != IOCONFIG_OUTPUT)
+         return;
+    WriteIO(thePin,value);
+}
+
+void WriteAllCoils()
+{
+    unsigned char loop;
+    unsigned short stemp;
+
+        stemp= ModbusData;
+        for(loop=0;loop<INPUT_COUNT;loop++)
+        {
+            SetSingleCoil(loop,(stemp & 1));
+            stemp/=2;
+        }
+       SendPresetFrame();
+}
+
+void ForceSingleCoil()
+{
+    if(ModbusAddress < INPUT_COUNT)
+    {
+
+       SetSingleCoil(ModbusAddress, ModbusData ==0 ? 0 : 1);
+       SendPresetFrame();
+
+    }
+    else
+      SendFrameError( ILLEGAL_DATA_ADDRESS);
+}
 
 
   // Function 6 Preset Single Register
@@ -1788,7 +2025,12 @@ void PresetSingleRegister()
 {
   unsigned char oldConfig;
   unsigned char temp;
-  if(ModbusAddress == 0x1ff)
+
+  if(ModbusAddress == 0x1002)
+  {
+      WriteAllCoils();
+  }
+  else if(ModbusAddress == 0x1ff)
   {
       EnableConfigChange= (ModbusData == 0x5678);
   }
@@ -1868,9 +2110,9 @@ void PresetSingleRegister()
 
 void ExecuteCommand(void)
 {
-
-  if(ModbusSlave != Setting.SlaveAddress)
-     return;    // this is not our Slave Address! just forget it
+  if(ModbusSlave!=0)
+   if(ModbusSlave != Setting.SlaveAddress)
+      return;    // this is not our Slave Address! just forget it
 
 #if BAUD == 9600
   __delay_us(400);

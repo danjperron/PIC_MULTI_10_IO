@@ -28,25 +28,28 @@ class PicMbus:
   IOConfig=[IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,
             IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT]
 
-  def __init__(self,SlaveAddress,Baud=57600,Device='/dev/ttyAMA0'):
+  def __init__(self,SlaveAddress,Baud=57600,Device='/dev/ttyUSB0'):
     self.SlaveAddress= SlaveAddress
     self.module = minimalmodbus.Instrument(Device,SlaveAddress)
     self.module.serial.baudrate=Baud
     self.module.serial.timeout=0.02
     self.module.serial.flushInput();
     #ok lire Identification
-    Id = self.readId()
+#    Id = self.readId()
    
-    Count=0
-    if  Id == 0x653A:
-     Count=10
-    else:
-     Count=2
+#    Count=0
+#    if  Id == 0x653A:
+    Count=10
+#    else:
+#     Count=2
 
     #ok lire Configuration
-    for loop in range(Count):
-      self.IOConfig[loop]= self.module.read_register(0x100+loop,0,3)
+ #   for loop in range(Count):
+ #     self.IOConfig[loop]= self.module.read_register(0x100+loop,0,3)
 
+  def setAddress(self, SlaveAddress):
+    self.SlaveAddress = SlaveAddress
+    self.module.address=SlaveAddress
 
   def config(self,Pin,value):
     #enable configuration change
@@ -102,6 +105,12 @@ class PicMbus:
   def writeIO(self,Pin,Value):
      self.module.write_bit(Pin,Value)
 
+  def writeAllIO(self,Value):
+     self.module.write_register(0x1002,Value,0,6)
+
+  def readAllIO(self):
+     return self.module.read_register(0x1002,0,4)
+  
 
   def readDHT(self,Pin):
      #check config
