@@ -779,10 +779,10 @@ INCCOUNTERIO0:
  
     }
 
-      if(_temp&0x10)
+      if(_temp&0x02)
     {
         //IO1
-        IOCBFbits.IOCBF4=0;
+        IOCBFbits.IOCBF1=0;
 
         if(IOCounterFlag.IO1)
         {
@@ -817,10 +817,10 @@ INCCOUNTERIO1:
         }
     }
 
-    if(_temp&0x20)
+    if(_temp&0x10)
     {
         //IO2
-        IOCBFbits.IOCBF5=0;
+        IOCBFbits.IOCBF4=0;
 
         if(IOCounterFlag.IO2)
         {

@@ -65,6 +65,7 @@ unsigned char scanOnly=0;
 unsigned char CurrentSlaveAddress=255;
 unsigned char CurrentSlaveId=0;
 unsigned char CurrentSlaveIOCount=0;
+long  timeout=10000;
 
 int IsModuleFound(modbus_t * mb, unsigned char  SlaveAddress);
 unsigned char selectModule(modbus_t * mb);
@@ -184,6 +185,11 @@ void decodeArg(int argc, char * argv[])
         loop++;
         Baud=atoi(argv[loop]);
       }
+    if(strcmp(argv[loop],"-t")==0)
+       {
+         loop++;
+         timeout = atol(argv[loop]);
+       }
     if(strcmp(argv[loop],"--help")==0)
       {
         printf("usage:\nconfigPIC  [-scan][-d DeviceName][-b BaudRate]\n");
@@ -558,13 +564,6 @@ void scanBus(modbus_t * mb)
   printf("\n==== Scanning MODBUS\n");fflush(stdout);
 
 
-//set 1/100th of second response time
-   struct timeval response;
-   response.tv_sec=0;
-   response.tv_usec=10000;
- modbus_set_response_timeout(mb, &response);
-
-
 
   for(loop=1;loop<128;loop++)
   {
@@ -753,6 +752,14 @@ int main(int argc, char * argv[])
 
    mb = modbus_new_rtu(device,Baud,'N',8,1);
    modbus_connect(mb);
+
+//set 1/100th of second response time
+   struct timeval response;
+   response.tv_sec=0;
+   response.tv_usec=timeout;
+ modbus_set_response_timeout(mb, &response);
+
+
 
 if(scanOnly==1)
   scanBus(mb);
