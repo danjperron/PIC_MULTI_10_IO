@@ -63,10 +63,10 @@ class PicMbus:
     return ioconfig    
 
   def readVRef2V(self):
-    return self.module.read_register(32,0,4)
+    return self.module.read_register(0x1000,0,4)
 
   def readDiode(self):
-    return self.module.read_register(33,0,4)
+    return self.module.read_register(0x1001,0,4)
 
   def readSensor(self,Pin):
     ioconfig= self.IOConfig[Pin]

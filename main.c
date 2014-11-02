@@ -141,7 +141,9 @@
 
 
 #define SOFTWARE_ID      0x653A
-#define RELEASE_VERSION 0x0102
+#define RELEASE_VERSION  0x0103
+
+
 
 ///////////////////  How to program the IC.
 //
@@ -2033,6 +2035,7 @@ void PresetSingleRegister()
   else if(ModbusAddress == 0x1ff)
   {
       EnableConfigChange= (ModbusData == 0x5678);
+      SendPresetFrame();
   }
   else if(ModbusAddress == 0xAA55)
   {
