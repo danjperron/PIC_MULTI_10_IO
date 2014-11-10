@@ -1,0 +1,132 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta name="viewport" content = "width = 420, user-scalable = no" /> 
+	<title>MultiIO Relais</title>
+        <script type="text/javascript" src="/webiopi.js"></script> 
+
+        <script type="text/javascript">
+
+
+        function generateButtonName(Module,Pin)
+          {
+              return("M" + Module.toString() + "IO" + Pin.toString());
+          }
+             
+
+
+        webiopi().ready(function(){
+         
+        // read pin onfo to start
+        for ( nModule = 0 ; nModule < 3 ; nModule++)
+              webiopi().callMacro("readAllPins",[nModule], readAllIOcallback);
+//        for ( nPin = 0 ; nPin < 8 ; nPin++)
+//          {
+//            webiopi().callMacro("readPin",[nModule,nPin],readcallback);
+//          }
+
+         });
+               
+         var readAllIOcallback = function(macro,args,response){
+                            var returnvalue = parseInt(response);
+                            var moduleid =  parseInt(args[0]);
+                            // let's fill up the button info
+                            for( nPin = 0 ; nPin < 8 ; nPin++)
+                            {
+                            // let's build the button name
+                            var buttonid =  generateButtonName(moduleid,nPin);
+                            var buttoncolor = "#c0c0c0";
+                            
+                            if((returnvalue&1) ==1)
+                              {
+                                buttoncolor= "#B0FFB0";
+                              }
+                             returnvalue/=2;
+                            document.getElementById(buttonid).style.background=buttoncolor;
+                           }
+                  }
+
+         var readcallback = function(macro,args,response){
+                            var returnvalue = parseInt(response);
+                            var moduleid =  parseInt(args[0]);
+                            var pinid    =  parseInt(args[1]);
+                            // let's build the button name
+                            var buttonid =  generateButtonName(moduleid,pinid);
+                            var buttoncolor = "#c0c0c0";
+
+                            if(returnvalue ==1)
+                              {
+                                buttoncolor= "#B0FFB0";
+                              }
+                            document.getElementById(buttonid).style.background=buttoncolor;
+                  }
+
+     
+
+  
+        function togglePin(click_id,module,Pin)
+        {
+           webiopi().callMacro("togglePin",[module,Pin],readcallback);
+        }
+
+
+        function allOFF()
+        {
+         for ( nModule = 0 ; nModule < 3 ; nModule++)
+          {
+           webiopi().callMacro("allOFF",[nModule]);
+           for ( i = 0 ; i < 8 ; i++)
+           {
+             var buttonid = generateButtonName(nModule,i);
+            document.getElementById(buttonid).style.background= "#C0C0C0";
+           }
+          }
+        }
+       
+
+
+
+        </script>
+<style type="text/css">
+
+
+               button   {
+                        margin: 1px 1px 1px 1px;
+                        width: auto;
+                        height: auto;
+                        font-size: 10pt;
+                        font-weight: bold;
+                        color: black;
+                        padding:5px;
+                        background-color:#c0c0c0;
+                }
+
+</style>
+
+</head>
+<body>
+
+        <script type="text/javascript">
+        document.write("<p align='center'><table><br>");
+        for( nPin=0;    nPin < 8    ; nPin++)
+          {
+           document.writeln("<tr>");             
+           for( nModule=0 ; nModule < 3 ; nModule++)
+             {
+              document.write("<td align='center'>");
+              var buttonName= generateButtonName(nModule,nPin);
+              var abutton = "<button id='" + buttonName + "' name='" + buttonName ;
+                  abutton +=  "' onclick='togglePin(this.id,";
+                  abutton +=  nModule + "," + nPin + ")'>";
+                  abutton +=  "Module " + nModule + " IO " + nPin + "</button></td>";
+              document.writeln(abutton);
+             }
+           document.writeln("</tr>");
+          }
+         document.writeln("<tr><td/><td><center><button id='alloff' name='alloff' onclick='allOFF()'>ALL OFF</button></center></td>");
+        
+        document.writeln("</table></p>");
+        </script>
+
+</body> </html>

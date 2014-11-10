@@ -97,8 +97,7 @@ void  ReadDHT22(modbus_t * mb,int _io)
 
 void ReadDS18B20(modbus_t * mb,int _io)
 {
-    float Factor,Temperature;
-    int mask;
+    float Factor=0.0625,Temperature;
     short Temp;
     uint16_t  MB_Register[3];
 
@@ -112,14 +111,6 @@ void ReadDS18B20(modbus_t * mb,int _io)
           }
          else if (MB_Register[0]==1)
          {
-           mask = MB_Register[2] & 0x60;
-           switch(mask)
-           {
-            case 0 :   Factor = 0.0625/8.0;break;
-            case 0x20: Factor = 0.0625/4.0;break;
-            case 0x40: Factor = 0.0625/2.0;break;
-            default:   Factor = 0.0625;
-           }
            Temperature = Factor * ((short)MB_Register[1]);
            printf("Temp: %5.1f Celsius",Temperature);
          }
@@ -282,7 +273,7 @@ int main(int argc, char * argv[])
 
    modbus_t *mb;
 
-   mb = modbus_new_rtu("/dev/ttyAMA0",Baud,'N',8,1);
+   mb = modbus_new_rtu("/dev/ttyUSB0",Baud,'N',8,1);
    modbus_connect(mb);
 
 

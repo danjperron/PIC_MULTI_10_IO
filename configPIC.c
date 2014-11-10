@@ -51,6 +51,9 @@ V1.0
 
 #include <modbus.h>
 
+
+#define DEFAULT_DEVICE "/dev/ttyUSB0"
+
 typedef struct
 {
 unsigned short     mode;
@@ -369,7 +372,7 @@ void changeConfigMode(modbus_t * mb,int Pin)
 
 void ReadDS18B20(modbus_t * mb,int _io)
 {
-    float Factor,Temperature;
+    float Factor=0.0625,Temperature;
     int mask;
     short Temp;
     uint16_t  MB_Register[3];
@@ -384,13 +387,6 @@ void ReadDS18B20(modbus_t * mb,int _io)
          else if (MB_Register[0]==1)
          {
            mask = MB_Register[2] & 0x60;
-           switch(mask)
-           {
-            case 0 :   Factor = 0.0625/8.0;break;
-            case 0x20: Factor = 0.0625/4.0;break;
-            case 0x40: Factor = 0.0625/2.0;break;
-            default:   Factor = 0.0625;
-           }
            Temperature = Factor * ((short)MB_Register[1]);
            printf("Temp: %5.1f Celsius",Temperature);
          }
@@ -474,7 +470,7 @@ void displaySensorData(modbus_t * mb, int _io)
 {
 uint16_t IOConfig;
 
-// read io configuratioe
+// read io configuration
      if(modbus_read_registers(mb,0x100+_io,1,&IOConfig)<0)
        {
          printf(" Unable to read configuration\n");
@@ -746,7 +742,7 @@ int main(int argc, char * argv[])
 
    modbus_t *mb;
 
-  strcpy(device,"/dev/ttyAMA0");
+  strcpy(device,DEFAULT_DEVICE);
 
   decodeArg(argc,argv);
 

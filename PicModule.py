@@ -7,7 +7,7 @@ class PicMbus:
    
 
   #CONFIGURATION IO
-
+  IOCONFIG_NONE= 255
   IOCONFIG_ANALOGVDD= 0  
   IOCONFIG_ANALOG1V=  1 
   IOCONFIG_ANALOG2V=  2  
@@ -25,14 +25,14 @@ class PicMbus:
   IOCONFIG_DS18B20=   32
   IOCONFIG_SERVO=     64
   IOCONFIG_COUNTER=   128
-  IOConfig=[IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,
-            IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT,IOCONFIG_INPUT]
+  IOConfig=[IOCONFIG_NONE,IOCONFIG_NONE,IOCONFIG_NONE,IOCONFIG_NONE,IOCONFIG_NONE,
+            IOCONFIG_NONE,IOCONFIG_NONE,IOCONFIG_NONE,IOCONFIG_NONE,IOCONFIG_NONE]
 
   def __init__(self,SlaveAddress,Baud=57600,Device='/dev/ttyUSB0'):
     self.SlaveAddress= SlaveAddress
     self.module = minimalmodbus.Instrument(Device,SlaveAddress)
     self.module.serial.baudrate=Baud
-    self.module.serial.timeout=0.02
+    self.module.serial.timeout=0.05
     self.module.serial.flushInput();
     #ok lire Identification
 #    Id = self.readId()
@@ -44,12 +44,15 @@ class PicMbus:
 #     Count=2
 
     #ok lire Configuration
- #   for loop in range(Count):
- #     self.IOConfig[loop]= self.module.read_register(0x100+loop,0,3)
+#   for loop in range(Count):
+#     self.IOConfig[loop]= self.module.read_register(0x100+loop,0,3)
 
   def setAddress(self, SlaveAddress):
     self.SlaveAddress = SlaveAddress
     self.module.address=SlaveAddress
+    #we change module . we don't know the io config so let's put it to none
+    for i in self.IOConfig:
+       i=self.IOCONFIG_NONE
 
   def config(self,Pin,value):
     #enable configuration change
@@ -69,7 +72,11 @@ class PicMbus:
     return self.module.read_register(0x1001,0,4)
 
   def readSensor(self,Pin):
+    #first let's checkif we know the config information
     ioconfig= self.IOConfig[Pin]
+
+    if ioconfig == self.IOCONFIG_NONE:
+      ioconfig= self.readConfig(Pin)  
 
     if (ioconfig == self.IOCONFIG_PWM) or (ioconfig == self.IOCONFIG_SERVO):
      return self.module.read_register(Pin);
@@ -114,6 +121,8 @@ class PicMbus:
 
   def readDHT(self,Pin):
      #check config
+     if self.IOConfig[Pin] == self.IOCONFIG_NONE:
+         self.readConfig(Pin)
      if (self.IOConfig[Pin] &  self.IOCONFIG_DHT11) == 0:
         #return IO  config not set for dht
         return None
@@ -137,6 +146,8 @@ class PicMbus:
 
   def readDS18B20(self,Pin):
      #check config
+     if self.IOConfig[Pin] == self.IOCONFIG_NONE:
+         self.readConfig(Pin)
      if (self.IOConfig[Pin] & self.IOCONFIG_DS18B20) ==0:
         #return IO  config not set for dht
         return None
@@ -145,18 +156,9 @@ class PicMbus:
         if value[0] == 0xffff:
            #No Sensor Found
            return None
-        if value[0] == 1:
-           mask = value[2] & 0x60
-           if mask == 0:
-             Factor = 0.0625/8.0
-           elif mask == 0x20:
-             Factor = 0.0625/4.0
-           elif mask == 0x40:
-             Factor = 0.0625/2.0
-           else:
-             Factor = 0.0625
-           Temp = value[1]
-           if(Temp & 0x8000) !=0:
-             Temp-=65536
-           return Temp*Factor
+        Factor = 0.0625
+        Temp = value[1]
+        if(Temp & 0x8000) !=0:
+           Temp-=65536
+        return Temp*Factor
 
