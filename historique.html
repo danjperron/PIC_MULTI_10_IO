@@ -1,0 +1,381 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <title>historique de la temperature</title>
+
+    <!-- Le styles -->
+    <link href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.2.2/css/bootstrap.min.css" rel="stylesheet">
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+    </style>
+    <link href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.2.2/css/bootstrap-responsive.min.css" rel="stylesheet">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="ico/favicon.ico">
+
+  </head>
+
+  <body>
+
+    <script type="text/javascript">
+
+       function GetTemperature() {
+         var space = "&nbsp;"
+         Myhttp = new XMLHttpRequest();
+         Myhttp.onreadystatechange = function(){
+                 if(Myhttp.readyState == 4) {
+                 var allText = Myhttp.responseText;
+                 var elem = document.getElementById("TheTemp");
+                 elem.innerHTML = space + space + space +allText + "&deg;C";
+                 elem.style.color="White";
+                    }
+                 //alert(allText);
+         }
+         Myhttp.open("GET","temperature/temperature.txt",false);
+         Myhttp.send();
+      }
+
+         
+       // return everything after the question mark
+       function GetUrlParameter() {
+         idx = window.location.href.indexOf("?");
+         if( idx < 0 ) return "";
+        return window.location.href.substring(idx+1);
+        }
+          urlParameter = GetUrlParameter();
+     </script>
+
+    <div class="navbar navbar-inverse navbar-fixed-top">
+         <div class="navbar-inner">
+           <div class="container-fluid">
+
+           <a class="brand" >La Temp&eacute;rature</a>
+             <div class="nav-collapse collapse">
+               <ul class="nav">
+                 <div class="brand" id="TheTemp"></div>
+               </ul>
+             </div><!--/.nav-collapse -->
+           </div>
+         </div>
+       </div>
+
+       <div class="container-fluid">
+         <div class="row-fluid">
+           <div class="span2">
+             <div class="well sidebar-nav">
+               <ul class="nav nav-list">
+                 <li class="nav-header">Temp&eacute;rature</li>
+                  <li><a href="historique.html?3h">Les derni&egrave;res 3h</a></li>
+                  <li><a href="historique.html?24h">Les derni&egrave;res 24h</a></li>
+                  <li><a href="historique.html?48h">Les derni&egrave;res 48h</a></li>
+                  <li><a href="historique.html?1w">La derni&egrave;re semaine</a></li>
+                  <li><a href="historique.html?1m">Le dernier mois</a></li>
+                  <li><a href="historique.html?3m">Les derniers 3 mois</a></li>
+                  <li><a href="historique.html?1y">La derni&egrave;re ann&eacute;e</a></li>
+               </ul>
+             </div><!--/.well -->
+           </div><!--/span-->
+           <div class="span10">
+             <div id="content">
+
+               </div>
+           </div><!--/span-->
+         </div><!--/row-->
+
+         <hr>
+
+       </div><!--/.fluid-container-->
+    <!-- Le javascript
+    ================================================== -->
+
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.9.0/jquery.min.js" charset="UTF-8"></script>
+<!--
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/highcharts/2.3.1/highcharts.js" charset="UTF-8"></script>
+-->
+    <script type="text/javascript" src="/charts/js/highcharts.js" charset="UTF-8"></script>
+    <script type="text/javascript">
+
+
+function computeSunrise(e, t) {
+	var n = 13.408056;
+	var r = 52.518611;
+	var i = 90.83333333333333;
+	var s = Math.PI / 180;
+	var o = 180 / Math.PI;
+	var u = n / 15;
+	var a;
+	if (t) {
+		a = e + (6 - u) / 24
+	} else {
+		a = e + (18 - u) / 24
+	}
+	M = .9856 * a - 3.289;
+	L = M + 1.916 * Math.sin(M * s) + .02 * Math.sin(2 * M * s) + 282.634;
+	if (L > 360) {
+		L = L - 360
+	} else if (L < 0) {
+		L = L + 360
+	}
+	RA = o * Math.atan(.91764 * Math.tan(L * s));
+	if (RA > 360) {
+		RA = RA - 360
+	} else if (RA < 0) {
+		RA = RA + 360
+	}
+	Lquadrant = Math.floor(L / 90) * 90;
+	RAquadrant = Math.floor(RA / 90) * 90;
+	RA = RA + (Lquadrant - RAquadrant);
+	RA = RA / 15;
+	sinDec = .39782 * Math.sin(L * s);
+	cosDec = Math.cos(Math.asin(sinDec));
+	cosH = (Math.cos(i * s) - sinDec * Math.sin(r * s)) / (cosDec * Math.cos(r * s));
+	var f;
+	if (t) {
+		f = 360 - o * Math.acos(cosH)
+	} else {
+		f = o * Math.acos(cosH)
+	}
+	f = f / 15;
+	T = f + RA - .06571 * a - 6.622;
+	UT = T - u;
+	if (UT > 24) {
+		UT = UT - 24
+	} else if (UT < 0) {
+		UT = UT + 24
+	}
+	localT = UT + 1;
+	return localT * 3600 * 1e3
+}
+function dayOfYear() {
+	var e = Math.floor((new Date).setFullYear((new Date).getFullYear(), 0, 1) / 864e5);
+	var t = Math.ceil((new Date).getTime() / 864e5);
+	var n = t - e;
+	return n
+}
+Highcharts.setOptions({
+	global: {
+		useUTC: false
+	}
+});
+
+options = {
+	chart: {
+		renderTo: "content",
+		type: "spline"
+	},
+	
+	title: {
+		text: "Temperatures of the last 24h"
+	},
+	
+	subtitle: {
+		text: ""
+	},
+	
+	xAxis: {
+		type: "datetime",
+		dateTimeLabelFormats: {
+			hour: "%H. %M"
+		}
+	},
+	
+	yAxis: {
+		title: {
+			text: "T (°C)"
+		}
+	},
+	
+	tooltip: {
+		formatter: function() {
+			return "<b>" + this.series.name + "</b><br/>" + Highcharts.dateFormat("%H:%M", this.x) + ": " + this.y.toFixed(1) + "°C"
+		}
+	},
+	
+	plotOptions: {
+		series: {
+			marker: {
+				radius: 2
+			}
+		}
+	},
+	
+	lineWidth: 1,
+	series: []
+}
+
+      
+       //   multiple parameters  decoder
+      function gup( name ){
+	name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");  
+	var regexS = "[\\?&]"+name+"=([^&#]*)";  
+	var regex = new RegExp( regexS );  
+	var results = regex.exec( window.location.href ); 
+ 	if( results == null )    return "";  
+	else    return results[1];}
+       
+
+        // return everything after the question mark
+       function GetUrlParameters() {
+         idx = window.location.href.indexOf("?");
+         if( idx < 0 ) return "";
+        return window.location.href.substring(idx+1);
+        }
+           
+
+      
+      function GetChartXml() {
+        switch(urlParameter)
+        {
+          case "3h":
+          case "48h":
+          case "1w":
+          case "1m":
+          case "3m":
+          case "1y":
+                     return "temperature/temperature" + urlParameter + ".xml";
+         }
+         return "temperature/temperature24h.xml";
+      }
+      
+      
+      function GetSerieName(sName)
+      {
+        
+        switch(sName)
+        {
+          
+          case "cpu": return "Le CPU";
+          case "Capteur1": return "Capteur 1";
+          case "Capteur2":   return "Capteur 2";
+        }
+        
+        
+        return sName;
+        
+      }
+      
+      function GetChartTitle()
+      {
+       
+        switch(urlParameter)
+        {
+          case "3h":
+                return "La température des 3 dernières heures";
+          case "48h":
+                return "La température des 48 dernières heures";
+          case "1w":
+                return "La température de la dernière semaine";
+          case "1m":
+                return "La température du dernier mois";
+          case "3m":
+                return "La température des 3 derniers mois";
+          case "1y":
+                return "La température de la dernière année";
+          }
+                return "La température des 24 dernières heures";
+      }
+
+     function GetNumberOfDays()
+     {
+        switch(urlParameter)
+        {
+          case "3h":
+                return 1;
+          case "48h":
+                return 2;
+          case "1w":
+                return 7;
+          case "1m":
+                return 31;
+          case "3m":
+                return 0;
+          case "1y":
+                return 0;
+          }
+                return 1;
+
+     }      
+      
+      
+      
+      
+      $(document).ready(function() {
+        GetTemperature();
+
+        $.ajax({
+          type: "GET",
+          url: GetChartXml(),
+          dataType: "xml",
+          success: function(xml) {
+            var series = []
+
+            //define series
+            $(xml).find("entry").each(function() {
+              var seriesOptions = {
+                name: GetSerieName($(this).text()),
+                data: []
+              };
+              options.series.push(seriesOptions);
+            });
+
+            //populate with data
+            $(xml).find("row").each(function() {
+              var t = parseInt($(this).find("t").text()) * 1000
+
+              $(this).find("v").each(function(index) {
+                var v = parseFloat($(this).text())
+                v = v || null
+                if (v != null) {
+                  options.series[index].data.push([t, v])
+                };
+              });
+            });
+
+            options.title.text = GetChartTitle();
+            $.each(series, function(index) {
+              options.series.push(series[index]);
+            });
+
+            //add sunrise and sunset
+            options.xAxis.plotBands = []
+
+            var nday= GetNumberOfDays();
+
+
+
+            if(nday>0)
+            for (var i = nday; i >= 0; i--) {
+              var d = new Date();
+              d.setHours(0,0,0,0);
+              d.setDate(d.getDate()-i);
+              var sunrise = d.getTime()+computeSunrise(dayOfYear(), true);
+              var sunset = d.getTime()+computeSunrise(dayOfYear(), false);
+              options.xAxis.plotBands.push({
+                from: sunrise,
+                to: sunset,
+                color: '#FCFFC5'  
+              });  
+            };
+
+
+            chart = new Highcharts.Chart(options);
+
+          }
+        });
+      });
+    </script>
+
+
+</body>
+</html>
+
