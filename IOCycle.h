@@ -3,7 +3,7 @@
 
 
 
-#include "IOCONFIG.h"
+#include "IOConfig.h"
 
 #define IO_CYCLE_IDLE          0
 #define IO_CYCLE_START         1

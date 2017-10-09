@@ -3,6 +3,14 @@
  * Author: daniel
  *
  * Created on 27 mars 2014, 21:59
+ * 
+ * 
+ * 
+ *  Version 1.04 October 2017
+ *  - Fix start signal for DHT22 and DHT11. Start pulse is 20ms
+ *  - Fix upper and lower case .c and .h file
+ *  - Fix signed/unsigned warning
+ *  - Fix memory overlap between Received buffer and DHT22 buffer
  */
 
 #ifdef __XC__
@@ -15,7 +23,7 @@
 #include "IOCycle.h"
 #include "DHT22.h"
 #include "DS18B20.h"
-#include "CAPSENSE.h"
+#include "CAPSense.h"
 #include "IOConfig.h"
 #include "RCServo.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +149,7 @@
 
 
 #define SOFTWARE_ID      0x653A
-#define RELEASE_VERSION  0x0103
+#define RELEASE_VERSION  0x0104
 
 
 
@@ -177,7 +185,7 @@
 
      baud rate 57600 , 8 bits data , no parity
     
-
+*/
 //////////////////////////  PORT DESCRIPTION
 /*
  * IO5 RA0
@@ -287,7 +295,7 @@ unsigned char RcvSerialSum;  // use for check sum verification
 bit ModbusOnTransmit;
 bit EnableConfigChange;
 bit ForceReset;
-char ModbusPacketBuffer[SERIAL_BUFFER_SIZE] @ 0x220;
+char ModbusPacketBuffer[SERIAL_BUFFER_SIZE];
 
 
 const unsigned char     IOMASK[11]={0b00001000,0b00000010,0b00010000,0b01000000,0b10000000,\
@@ -1178,7 +1186,7 @@ void putch(char char_out)
 
     SerialSum+= (unsigned char) char_out;
 // increment circular pointer InFiFo
-   temp = InFiFo + 1;
+   temp = (unsigned char) (InFiFo + 1);
    if(temp >= SERIAL_BUFFER_SIZE)
      temp = 0;
 
@@ -1364,7 +1372,7 @@ void  DoSumAllCounter()
 }
 
 
-
+/*
 unsigned char  RcvGetBufferLength(void)
 {
    unsigned char temp;
@@ -1378,6 +1386,7 @@ unsigned char  RcvGetBufferLength(void)
    return temp;
 
 }
+*/
 
 void RcvClear(void)
 {
@@ -1388,7 +1397,7 @@ void RcvClear(void)
 }
 unsigned char RcvIsDataIn(void)
  {
-     return (RcvInFiFo == RcvOutFiFo ? 0 : 1);
+     return (RcvInFiFo == RcvOutFiFo ?  0U :  1U);
  }
 
 char RcvGetChar(void)
@@ -1407,7 +1416,7 @@ char RcvGetChar(void)
     return temp;
 }
 
-
+/*
 void TXM_WAIT(void)
 {
     while(TXIE);
@@ -1418,17 +1427,17 @@ void TXM_WAIT(void)
 #endif
     TXM_ENABLE=0;
 }
+*/
 
 
-
-void SendModbusPacket(int BufferSize)
+void SendModbusPacket(unsigned char BufferSize)
 {
     unsigned short CRC;
     unsigned char loop;
 
     if(ModbusSlave==0) return;
 
-    CRC = CRC16(ModbusPacketBuffer,BufferSize);
+    CRC =  CRC16(ModbusPacketBuffer,BufferSize);
     //RS-485 on TRANSMISSION
     ModbusOnTransmit=1;
     TXM_ENABLE=1;
@@ -1452,7 +1461,7 @@ void InitModbusPacket(void)
 void  SendFrameError(unsigned char ErrorCode)
 {
     InitModbusPacket();
-    ModbusPacketBuffer[1]= ModbusFunction | 0x80;
+    ModbusPacketBuffer[1]= (unsigned char) (ModbusFunction | 0x80);
     ModbusPacketBuffer[2]= ErrorCode;
     SendModbusPacket(3);
 }
@@ -1605,7 +1614,7 @@ BYTELOOP:
 #endasm
          ei();
 
-       SendModbusPacket(NByte+3);
+       SendModbusPacket((unsigned char) (NByte+3));
      }
 }
 
@@ -1850,7 +1859,7 @@ unsigned char GetInputPin(unsigned char thePin)
     else
        _tmp = PORTA;
     _tmp &= IOMASK[thePin];
-    return (_tmp==0 ? 0 : 1);
+    return ( (unsigned char) (_tmp==0 ?0 : 1));
 }
 
 unsigned short ReadAllCoils(void)
@@ -1861,7 +1870,7 @@ unsigned short ReadAllCoils(void)
     for(loop=0;loop<INPUT_COUNT;loop++)
         {
             stemp *=2;
-            stemp |= GetInputPin((INPUT_COUNT -1)-loop);
+            stemp |= (unsigned short) GetInputPin( (unsigned char) ((INPUT_COUNT -1)-loop));
         }
     return stemp;
 }
@@ -2005,7 +2014,7 @@ void ForceSingleCoil()
     if(ModbusAddress < INPUT_COUNT)
     {
 
-       SetSingleCoil(ModbusAddress, ModbusData ==0 ? 0 : 1);
+       SetSingleCoil(ModbusAddress, (unsigned char) ( ModbusData ==0 ? 0 : 1));
        SendPresetFrame();
 
     }
@@ -2395,7 +2404,7 @@ FVRCON=0b11000010;  // Vref internal 2.048V on ADC
           {
               // something wrong then just shift data
               for(loop=1;loop<8;loop++)
-                  ModbusBuffer[loop-1]=ModbusBuffer[loop];
+                  ModbusBuffer[loop-1U]=ModbusBuffer[loop];
               ModbusFramePointer--;
           }
          }

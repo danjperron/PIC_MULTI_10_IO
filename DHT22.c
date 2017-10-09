@@ -25,7 +25,7 @@ unsigned char DHTBufferIndex @ 0x24f;
 
 void DHT22Error(void)
 {
-int loop;
+
  // KILL interrup
 TMR0IE=0;
 SetIOChange(CurrentIOPin,0);
@@ -45,6 +45,7 @@ if(Timerms > 1000)  // more than 1000ms
  {
    // ok Half second pass 
    // time to start pulse
+    Timerms=0;
  _ctemp = NOT_IOMASK[CurrentIOPin];
 
       di();
@@ -72,16 +73,16 @@ if(Timerms > 1000)  // more than 1000ms
 void DHT22CycleStart(void)
 {
     unsigned char _ctemp= IOMASK[CurrentIOPin];
-    unsigned char _ntemp= ~_ctemp;
+    unsigned char _ntemp= (unsigned char) ~_ctemp;
   // wait until Timerms got at least 2ms (2 counts).
 
 CurrentIOStatus=IO_STATUS_UNKNOWN;
-CurrentIOCycle= IO_CYCLE_WAIT;
 
-    if(Timerms >3)
+
+    if(Timerms >20)
   {
     // release for
-
+CurrentIOCycle= IO_CYCLE_WAIT;
    
    
 

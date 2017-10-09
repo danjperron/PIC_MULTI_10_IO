@@ -12,7 +12,7 @@
 #include "IOCycle.h"
 #include "DS18B20.h"
 #include "DHT22.h"
-#include "CAPSENSE.h"
+#include "CAPSense.h"
 
 
 unsigned char CurrentIOStatus;
@@ -218,9 +218,9 @@ char  ReadIOPin(unsigned char Pin)
     unsigned char _tempb;
     unsigned char mask = IOMASK[Pin];
       if(Pin<5)
-          _tempb = PORTB & mask;
+          _tempb = (unsigned char) (PORTB & mask);
       else
-          _tempb = PORTA & mask;
+          _tempb =  (unsigned char) (PORTA & mask);
       if(_tempb==0)
           return 0;
       return 1;

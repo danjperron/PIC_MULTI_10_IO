@@ -48,9 +48,8 @@ V1.0
 #include <stdlib.h>
 #include <errno.h>
 #include <termios.h>
-
 #include <modbus.h>
-
+#include <ctype.h>
 
 #define DEFAULT_DEVICE "/dev/ttyUSB0"
 
@@ -464,6 +463,32 @@ void  ReadDHT22(modbus_t * mb,int _io)
       printf("Unable to read DHT22 Sensor");
     printf("\n"); 
 }
+void  ReadDHT11(modbus_t * mb,int _io)
+{
+    float Temperature,Humidity;
+    static char status[256];
+  uint16_t  MB_Register[3];
+
+
+    if(modbus_read_input_registers(mb,_io*16,3,MB_Register)>=0)
+       {
+         if(MB_Register[0]==0)
+          {
+            printf("Buzy"); 
+          }
+         else if (MB_Register[0]==1)
+         {
+        Temperature = (MB_Register[2] & 0xff);
+        Humidity = (MB_Register[1] &0xff);
+        printf("Temp: %5.0f Celsius   Humidity: %5.0f%%",
+          Temperature,Humidity);     
+         }
+         else printf("Error");
+       }
+     else
+      printf("Unable to read DHT11 Sensor");
+    printf("\n"); 
+}
 
 
 void displaySensorData(modbus_t * mb, int _io)
@@ -495,7 +520,7 @@ uint16_t IOConfig;
        case IOCONFIG_CAP_SENSE_HIGH:  RawData(mb,_io,2);break;
 
 
-       case IOCONFIG_DHT11:       RawData(mb,_io,3);break;
+       case IOCONFIG_DHT11:       ReadDHT11(mb,_io);break;
        case IOCONFIG_DHT22:       ReadDHT22(mb,_io);break;
        case IOCONFIG_DS18B20:     ReadDS18B20(mb,_io);break;
        case IOCONFIG_SERVO:

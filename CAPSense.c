@@ -9,7 +9,7 @@
 #include "IOCycle.h"
 #include "DS18B20.h"
 #include "IOConfig.h"
-#include "CAPSENSE.h"
+#include "CAPSense.h"
 
 
 bit  WaitForStartDeciSecond;

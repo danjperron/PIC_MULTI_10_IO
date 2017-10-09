@@ -17,7 +17,7 @@ near unsigned char ServoMask;
 void DoRCServo(void)
 {
     unsigned char BMask;
-    short _temp;
+    unsigned short _temp;
 
     if(!TMR1ON)
     {
@@ -40,12 +40,12 @@ void DoRCServo(void)
         {
             if(ServoIdleTime<0)
                 return;
-            TMR1= (~ServoIdleTime)+1;
+            TMR1= (~((unsigned short)ServoIdleTime))+1;
         }
         else
         {
             _temp = ServoTimer[ServoIndex];
-            ServoIdleTime-=(short) _temp;
+            ServoIdleTime-= _temp;
             if(_temp==0)
                 return;
             TMR1= (~_temp)+1;
