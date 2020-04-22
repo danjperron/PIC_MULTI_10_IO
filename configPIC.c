@@ -776,10 +776,12 @@ int main(int argc, char * argv[])
 
 //set 1/100th of second response time
    struct timeval response;
-   response.tv_sec=0;
-   response.tv_usec=timeout;
- modbus_set_response_timeout(mb, &response);
 
+// new version used directly uint32_t variable
+//   response.tv_sec=0;
+//   response.tv_usec=timeout;
+// modbus_set_response_timeout(mb, &response);
+modbus_set_response_timeout(mb,0, (uint32_t) timeout));
 
 
 if(scanOnly==1)
