@@ -61,13 +61,13 @@ unsigned char SpecialFunctions;
 }IOConfigStruct;
 
 char device[256];
-int Baud = 57600;
+int Baud = 9600;
 
 unsigned char scanOnly=0;
 unsigned char CurrentSlaveAddress=255;
 unsigned char CurrentSlaveId=0;
 unsigned char CurrentSlaveIOCount=0;
-long  timeout=10000;
+long  timeout=0;
 
 int IsModuleFound(modbus_t * mb, unsigned char  SlaveAddress);
 unsigned char selectModule(modbus_t * mb);
@@ -186,6 +186,12 @@ void decodeArg(int argc, char * argv[])
       {
         loop++;
         Baud=atoi(argv[loop]);
+        if(Baud >0)
+        if(timeout == 0)
+        {
+          timeout = (1000000 / Baud)*576;
+        }
+
       }
     if(strcmp(argv[loop],"-t")==0)
        {
@@ -308,7 +314,6 @@ unsigned char selectModule(modbus_t * mb)
 
 void changeConfigMode(modbus_t * mb,int Pin)
 {
-  
   int loop;
   unsigned short  mode;
   unsigned char  module;
@@ -501,7 +506,6 @@ uint16_t IOConfig;
          printf(" Unable to read configuration\n");
          return;
        }
-     
 
      switch(IOConfig)
       {
@@ -687,7 +691,7 @@ int SelectedIO;
 
  printf("\nPIC multi-purpose I/O  MODBUS configuration\n");
  printf("Version 1.0 (c) Daniel Perron, April 2014\n");
- printf("device:%s Baud Rate:%d\n",device,Baud);
+ printf("device:%s Baud Rate:%d timeout:%uus\n",device,Baud,timeout);
  while(1)
   {
     // print menu
@@ -770,12 +774,17 @@ int main(int argc, char * argv[])
   strcpy(device,DEFAULT_DEVICE);
 
   decodeArg(argc,argv);
+  timeout = ((timeout + 500)  / 1000) * 1000;
+  if(timeout ==0)
+     timeout=10000;
+  if(timeout > 999900)
+     timeout=999900;
 
    mb = modbus_new_rtu(device,Baud,'N',8,1);
    modbus_connect(mb);
 
 //set 1/100th of second response time
-   struct timeval response;
+//   struct timeval response;
 
 // new version used directly uint32_t variable
 //   response.tv_sec=0;
