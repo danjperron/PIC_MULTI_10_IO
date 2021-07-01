@@ -2128,11 +2128,12 @@ void ExecuteCommand(void)
   if(ModbusSlave!=0)
    if(ModbusSlave != Setting.SlaveAddress)
       return;    // this is not our Slave Address! just forget it
-
 #if BAUD == 9600
+  __delay_us(800);
+#elif BAUD == 19200
   __delay_us(400);
 #else
-  __delay_us(100);
+  __delay_us(200);
 #endif
  // if(ModbusLRC != ModbusCheckSum)
  //     return; // invalide check sum we should deal with it
