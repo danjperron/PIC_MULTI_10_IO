@@ -4,10 +4,9 @@
  *
  * Created on 27 mars 2014, 21:59
  * 
- *  Version 1.05  February 2021
- *  - add different delay depending of baudrate
- *    EN_DELAY to turn direction rs-485
- *    this fixes issue when baud was different than 57600
+ *  Version 1.05 November 2021
+ *  - add COUNTER_PULLUP feature
+ *  - increase delay in ReadDS18B20
  * 
  *  Version 1.04 October 2017
  *  - Fix start signal for DHT22 and DHT11. Start pulse is 20ms
@@ -150,7 +149,6 @@
 // 
 //
 
-
 #define SOFTWARE_ID      0x653A
 #define RELEASE_VERSION  0x0105
 
@@ -186,7 +184,7 @@
 
 /*  COMMUNICATION PROTOCOL
 
-     baud rate 57600 , 8 bits data , no parity
+     rate 57600 , 8 bits data , no parity
     
 */
 //////////////////////////  PORT DESCRIPTION
@@ -605,7 +603,8 @@ void SetIOConfig(unsigned char Pin)
   }
   else if(ioconfig.COUNTER)
   {
-                            SetPullUp(Pin,0);
+      if(!ioconfig.PULLUP)
+         SetPullUp(Pin,0);
                             SetInputConfig(Pin);
                             SetIOChange(Pin,1);
                             if(Pin==0)
@@ -2093,7 +2092,7 @@ void PresetSingleRegister()
         oldConfig= Setting.IOConfig[ModbusAddress];
         if(!SetPWMConfig(ModbusAddress,ModbusData)) // This only works if available
         {
-           if(oldConfig==IOCONFIG_COUNTER)
+           if((oldConfig==IOCONFIG_COUNTER) || (oldConfig==IOCONFIG_COUNTER_PULLUP))
         {
             if(ModbusData==0)
                 IOSensorData[ModbusAddress].DWORD=0;
@@ -2128,12 +2127,11 @@ void ExecuteCommand(void)
   if(ModbusSlave!=0)
    if(ModbusSlave != Setting.SlaveAddress)
       return;    // this is not our Slave Address! just forget it
+
 #if BAUD == 9600
-  __delay_us(800);
-#elif BAUD == 19200
   __delay_us(400);
 #else
-  __delay_us(200);
+  __delay_us(100);
 #endif
  // if(ModbusLRC != ModbusCheckSum)
  //     return; // invalide check sum we should deal with it
@@ -2223,7 +2221,6 @@ void ExecuteCommand(void)
  SYNC =0;
  SPBRGL = 207; // assume 32Mhz clock
  SPBRGH =0;
-#define EN_DELAY 2080
 #elif BAUD == 19200
   BRGH =0;
  BRG16 = 1;
@@ -2231,19 +2228,17 @@ void ExecuteCommand(void)
 
  SPBRGL = 103;
  SPBRGH = 0;
-#define EN_DELAY 1080
+
 #elif BAUD == 38400
  BRGH = 1;
  BRG16=1;
  SYNC =0;
  SPBRG = 208;
- #define EN_DELAY 520
 #elif BAUD == 115200
  // assume  baud 115200
  BRGH =1;
  BRG16 = 1;
  SYNC =0;
- #define EN_DELAY 520
 
 
  SPBRGL = 68; // assume 32Mhz clock
@@ -2259,7 +2254,6 @@ void ExecuteCommand(void)
 
  SPBRGL = 138; // assume 32Mhz clock
  SPBRGH =0;
- #define EN_DELAY 350
 
 #endif
 
@@ -2380,7 +2374,11 @@ FVRCON=0b11000010;  // Vref internal 2.048V on ADC
      {
          if(!TXIE)
          {
-             __delay_us(EN_DELAY);
+#if BAUD == 9600
+             __delay_us(800);
+#else
+             __delay_us(200);
+#endif
              TXM_ENABLE=0;
              ModbusOnTransmit=0;
          }

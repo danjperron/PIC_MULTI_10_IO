@@ -113,16 +113,9 @@ unsigned char DS18B20Read()
 
 #asm
      nop
-     nop
-     nop
-     nop
-     nop
-     nop
-     nop
-     nop
 #endasm
-   // delay 2us
-   SetTimer6Delay500ns(1);
+   // delay 1us
+   SetTimer6Delay500ns(2);
    while(!TMR6IF);
    if(ReadIOPin(CurrentIOPin)>0)
    {

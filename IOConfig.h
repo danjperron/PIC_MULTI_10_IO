@@ -23,11 +23,12 @@
 #define IOCONFIG_DS18B20   32
 #define IOCONFIG_SERVO     64
 #define IOCONFIG_COUNTER   128
-
+#define IOCONFIG_COUNTER_PULLUP 129
 
 typedef union {
     struct {
-        unsigned NO_USED           :3;
+        unsigned PULLUP            :1;
+        unsigned NO_USED           :2;
         unsigned CAP_SENSE         :1;
         unsigned DHT               :1;
         unsigned DS18B20           :1;
@@ -116,13 +117,13 @@ unsigned char SlaveAddress;
 
 extern SettingStruct Setting;
 
-//#define BAUD 9600
+#define BAUD 9600
 //#define BAUD 19200
 //#define BAUD 38400
-#define BAUD 57600
+//#define BAUD 57600
 //#define BAUD 115200
 
-#define USE_EXTERNAL_XTAL
+//#define USE_EXTERNAL_XTAL
 
 #ifndef _XTAL_FREQ
 #define _XTAL_FREQ 32000000
