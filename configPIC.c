@@ -1,7 +1,7 @@
 /**************************************
 PIC Multi-Purpose Modbus
 
-configuration application 
+configuration application
 
 This program is used to set the Modbus Address of the PIC Multi-purpose module
 
@@ -14,7 +14,7 @@ to compile:
 libmodbus is needed
 
  please check url: http://libmodbus.org
- 
+
  You could  download libmodbus on the Raspberry Pi using
 
     sudo apt-get install libmodbus5 libmodbus-dev
@@ -92,6 +92,7 @@ unsigned char selectModule(modbus_t * mb);
 #define IOCONFIG_DS18B20   32
 #define IOCONFIG_SERVO     64
 #define IOCONFIG_COUNTER   128
+#define IOCONFIG_COUNTER_PULLUP   129
 
 
 IOConfigStruct  configInfo[]={
@@ -112,12 +113,13 @@ IOConfigStruct  configInfo[]={
   {  IOCONFIG_DS18B20, "DS18B20",0},
   {  IOCONFIG_SERVO, "R/C SERVO",0},
   {  IOCONFIG_COUNTER, "COUNTER",1},
+  {  IOCONFIG_COUNTER_PULLUP, "COUNTER PULLUP",1},
   {65535, "",0}};
 
 unsigned char  IsPinHaveSpecialFunctions[]={1,1,1,1,1,0,0,0,0,0};
 unsigned char  IsPinHavePWM[]=             {1,0,0,1,0,0,0,0,1,1};
 
-
+int moduleID =0;
 
 int GetConfigIndex(int mode)
 {
@@ -136,7 +138,17 @@ int IsConfigValidOnPin(int mode, int Pin)
 {
     int  configIndex;
 
+    if(moduleID ==0) return 0;
+
     if(Pin<0) return 0;
+
+    if(mode == IOCONFIG_COUNTER_PULLUP)
+     {
+      if(moduleID != 0x653A)
+         return 0;
+      if(Pin>1) return 0;
+     }
+
     if(Pin>9) return 0;
 
     configIndex = GetConfigIndex(mode);
@@ -146,9 +158,12 @@ int IsConfigValidOnPin(int mode, int Pin)
     if(mode == IOCONFIG_PWM)
         return IsPinHavePWM[Pin];
 
+
     if(configInfo[configIndex].SpecialFunctions)
       if(IsPinHaveSpecialFunctions[Pin]==0)
+         {
             return 0;
+         }
 
     return 1;
 }
@@ -200,7 +215,7 @@ void decodeArg(int argc, char * argv[])
        }
     if(strcmp(argv[loop],"--help")==0)
       {
-        printf("usage:\nconfigPIC  [-scan][-d DeviceName][-b BaudRate]\n");
+        printf("usage:\nconfigPIC  [-scan][-d DeviceName][-b BaudRate] [-t response_Delay_us]\n");
         exit(0);
       }
   }
@@ -333,7 +348,7 @@ void changeConfigMode(modbus_t * mb,int Pin)
   if(CurrentSlaveAddress==255) return;
 
   mode=getConfigMode(mb,Pin);
- 
+
 
   for(loop=0;;loop++)
     {
@@ -386,7 +401,7 @@ void ReadDS18B20(modbus_t * mb,int _io)
        {
          if(MB_Register[0]==0)
           {
-            printf("Buzy"); 
+            printf("Buzy");
           }
          else if (MB_Register[0]==1)
          {
@@ -413,13 +428,6 @@ void ServoData(modbus_t * mb, unsigned char _io)
       printf("[%d (0x%04X)] ",MB_Register,MB_Register);
     printf("\n");
   }
-
-
-
-
-
-
-
 }
 
 
@@ -449,7 +457,7 @@ void  ReadDHT22(modbus_t * mb,int _io)
        {
          if(MB_Register[0]==0)
           {
-            printf("Buzy"); 
+            printf("Buzy");
           }
          else if (MB_Register[0]==1)
          {
@@ -460,14 +468,16 @@ void  ReadDHT22(modbus_t * mb,int _io)
         Temperature = (MB_Register[2] & 0x7fff) * Factor;
         Humidity = (MB_Register[1] * 0.1);
         printf("Temp: %5.1f Celsius   Humidity: %5.1f%%",
-          Temperature,Humidity);     
+          Temperature,Humidity);
          }
          else printf("Error");
        }
      else
       printf("Unable to read DHT22 Sensor");
-    printf("\n"); 
+    printf("\n");
 }
+
+
 void  ReadDHT11(modbus_t * mb,int _io)
 {
     float Temperature,Humidity;
@@ -479,20 +489,20 @@ void  ReadDHT11(modbus_t * mb,int _io)
        {
          if(MB_Register[0]==0)
           {
-            printf("Buzy"); 
+            printf("Buzy");
           }
          else if (MB_Register[0]==1)
          {
         Temperature = (MB_Register[2] & 0xff);
         Humidity = (MB_Register[1] &0xff);
         printf("Temp: %5.0f Celsius   Humidity: %5.0f%%",
-          Temperature,Humidity);     
+          Temperature,Humidity);
          }
          else printf("Error");
        }
      else
       printf("Unable to read DHT11 Sensor");
-    printf("\n"); 
+    printf("\n");
 }
 
 
@@ -514,7 +524,7 @@ uint16_t IOConfig;
        case IOCONFIG_ANALOG2V:  RawData(mb,_io,1);break;
        case IOCONFIG_ANALOG4V:  RawData(mb,_io,1);break;
 
-       case IOCONFIG_INPUT:     
+       case IOCONFIG_INPUT:
        case IOCONFIG_INPUT_PULLUP:
        case IOCONFIG_OUTPUT:     RawData(mb,_io,1);break;
 
@@ -529,6 +539,7 @@ uint16_t IOConfig;
        case IOCONFIG_DS18B20:     ReadDS18B20(mb,_io);break;
        case IOCONFIG_SERVO:
        case IOCONFIG_PWM:         ServoData(mb,_io);break;
+       case IOCONFIG_COUNTER_PULLUP:
        case IOCONFIG_COUNTER:    RawData(mb,_io,3);break;
        default:   printf("\n");
       }
@@ -544,25 +555,24 @@ void DisplayIOConfig(modbus_t * mb)
   int loop,io;
   int rcode;
   uint16_t  MB_Register;
-  int Id;
   int configMode;
+  double VDD;
 
   if(CurrentSlaveAddress==255)
       return;
 
 
-    Id = IsModuleFound(mb,CurrentSlaveAddress);
+    moduleID = IsModuleFound(mb,CurrentSlaveAddress);
 
-   if(Id)
+   if(moduleID)
    {
 
     printf("=============\n%d : ",CurrentSlaveAddress);
 
-    printf("Type %04X  Multi Purpose %dIO\n", Id, Id & 0xf);
+    printf("Type %04X  Multi Purpose %dIO\n", moduleID, moduleID & 0xf);
 
-    Id &= 0xf;
 
-    for(io=0;io<Id;io++)
+    for(io=0;io<(moduleID & 0xf);io++)
     {
       printf("%5sIO%d: ","",io);
       configMode= getConfigMode(mb,io);
@@ -573,6 +583,26 @@ void DisplayIOConfig(modbus_t * mb)
       else
         printf("*** IVALID CONFIGURATION ***\n");
     }
+
+    if(moduleID == 0x653A)
+    {
+      uint16_t MB_Register[3];
+      printf("\n");
+      // get VDD
+      if(modbus_read_input_registers(mb,0x1000,1,MB_Register)>=0)
+	{
+          if(MB_Register[0]>0)
+          {
+           VDD = 2.048 * 1023 / MB_Register[0];
+           printf("%5sVDD: %5.2fV","",VDD);
+           // get DIODE A/D
+           if(modbus_read_input_registers(mb,0x1001,1,MB_Register)>=0)
+	    {
+                 printf("     Diode A/D: %d\n",MB_Register[0]);
+            }
+          }
+       }
+    }
     printf("\n");
    }
 }
@@ -582,12 +612,11 @@ void scanBus(modbus_t * mb)
 {
   int loop,io;
   int rcode;
-  uint16_t  MB_Register;
   int Id;
+  uint16_t  MB_Register;
 
 
   printf("\n==== Scanning MODBUS\n");fflush(stdout);
-
 
 
   for(loop=1;loop<128;loop++)
@@ -654,8 +683,8 @@ void ResetModule(modbus_t  * mb)
       usleep(500000);
       printf(".");fflush(stdout);
      }
-  printf("\n"); 
-  modbus_flush(mb);   
+  printf("\n");
+  modbus_flush(mb);
 }
 
 void SetOutputSignal(modbus_t * mb)
@@ -728,8 +757,7 @@ int SelectedIO;
                 fflush(stdout);
                 usleep(500000);
                 break;
-     case 'I':  
-                if(CurrentSlaveAddress!=255)
+     case 'I':  if(CurrentSlaveAddress!=255)
                   DisplayIOConfig(mb);
                 break;
      case 'A':  selectModule(mb);break;
@@ -740,7 +768,7 @@ int SelectedIO;
      case 'R': if(CurrentSlaveAddress != 255)
                 ResetModule(mb);
                 break;
-     case '0':  
+     case '0':
      case '1':
      case '2':
      case '3':
@@ -760,9 +788,6 @@ int SelectedIO;
   }
 
 }
-
-
-
 
 
 
