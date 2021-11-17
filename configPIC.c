@@ -138,15 +138,14 @@ int IsConfigValidOnPin(int mode, int Pin)
 {
     int  configIndex;
 
-    if(moduleID ==0) return 0;
+    if(moduleID == 0) return 0;
 
     if(Pin<0) return 0;
 
     if(mode == IOCONFIG_COUNTER_PULLUP)
      {
       if(moduleID != 0x653A)
-         return 0;
-      if(Pin>1) return 0;
+          if(Pin>1) return 0;
      }
 
     if(Pin>9) return 0;
@@ -581,7 +580,7 @@ void DisplayIOConfig(modbus_t * mb)
       if(IsConfigValidOnPin(configMode,io))
         displaySensorData(mb,io);
       else
-        printf("*** IVALID CONFIGURATION ***\n");
+        printf("*** INVALID CONFIGURATION ***\n");
     }
 
     if(moduleID == 0x653A)
