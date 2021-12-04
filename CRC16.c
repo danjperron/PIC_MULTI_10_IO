@@ -111,6 +111,27 @@ for (; num>0; num--)               /* Step through bytes in memory */
   return(crc);                     /* Return updated CRC */
 }
 
+unsigned char  CRC8(unsigned char *addr, unsigned char  num)
+{
+unsigned char  i;
+
+unsigned char crc=0;
+
+for (; num>0; num--)          // Step through bytes in memory 
+  {
+  crc = crc ^ (*addr++);      // Fetch byte from memory, XOR into CRC top byte
+  for (i=8; i>0; i--)         // Prepare to rotate 8 bits 
+    {
+     if(crc & 0x1)
+       crc =  (crc >>1) ^ 0x8C;
+     else
+       crc =  crc >>1;
+    }                         // Loop for 8 bits 
+  }                           // Loop until num=0 
+
+return(crc);                  // Return updated CRC 
+}
+
 
 #endif
 

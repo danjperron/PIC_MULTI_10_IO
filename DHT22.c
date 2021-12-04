@@ -26,7 +26,7 @@ unsigned char DHTBufferIndex @ 0x24f;
 void DHT22Error(void)
 {
 
- // KILL interrup
+ // KILL interrupt
 TMR0IE=0;
 SetIOChange(CurrentIOPin,0);
 CurrentIOCycle=IO_CYCLE_END;
@@ -46,17 +46,30 @@ if(Timerms > 1000)  // more than 1000ms
    // ok Half second pass 
    // time to start pulse
     Timerms=0;
- _ctemp = NOT_IOMASK[CurrentIOPin];
-
-      di();
+  _ctemp = NOT_IOMASK[CurrentIOPin];
+  di();
+#ifndef USEASM
       IOCBN &= _ctemp;
       IOCBF &= _ctemp;
-      ei();
-      di();
       TRISB &= _ctemp;
       PORTB &= _ctemp;
-      ei();
-
+#else
+ {
+#asm
+     movf DHT22CycleIdle@_ctemp,w
+     movlb 7
+     andwf 21,f
+     andwf 22,f
+     movlb 1
+     andwf 13,f
+     movlb 0
+     andwf 13,f
+#endasm 
+ }
+#endif
+ ei();
+ 
+ 
     CurrentIOCycle= IO_CYCLE_START;
     BitCount=40;
     WorkingByte=0;
@@ -111,13 +124,6 @@ CurrentIOCycle= IO_CYCLE_WAIT;
   asm("NOP");
   asm("NOP");
   asm("NOP");
-  asm("NOP");
-  asm("NOP");
-  asm("NOP");
-  asm("NOP");
-
-
-
 // enable TMR0 interrupt
 }
 }
@@ -155,7 +161,12 @@ void CheckDHTBitBuffer(void)
         {
             WorkingByte*=2;
             if(DHTBitBuffer[BitCount++] > 110)
-            WorkingByte++;
+            {
+              //WorkingByte++;
+              #asm
+                incf _WorkingByte,f
+              #endasm
+            }
         }
         if(loop<4)
         {
@@ -174,7 +185,12 @@ void CheckDHTBitBuffer(void)
 
     if(Retry==0)
     {
-        Retry++;
+        {
+            //Retry++;
+              #asm
+                incf _Retry,f
+              #endasm
+        }
         Timerms=0;
         CurrentIOCycle=IO_CYCLE_IDLE;
     }

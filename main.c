@@ -51,10 +51,17 @@
 // 7- Cap sensor signale with 4 different power setting.
 // 8- Pulse counter. Give Pulse count at Pulse/sec.
 
+
+//   Date: Dec 1 2021
+//   Version 1.06
+//   Processeur PIC16F1827
+//   Compiler XC8 V1.44 or lower
+//   add CRC check on DS18B20 and counter pull-up option
+
 //   Date: 27 Mars 2014
 //   programmer: Daniel Perron
 //   Version: 1.0
-//   Processeur: PIC12F1840
+//   Processeur: PIC12F1827
 //   logiciel de compilation:  Microchip MPLAB  X IDE (freeware version)
 //
 //   The system use serial communication at 57600 BAUD with modbus protocol.
@@ -150,7 +157,7 @@
 //
 
 #define SOFTWARE_ID      0x653A
-#define RELEASE_VERSION  0x0105
+#define RELEASE_VERSION  0x0106
 
 
 
@@ -405,26 +412,38 @@ void SetOutputConfig(unsigned char Pin)
 
     unsigned char ioconfig = Setting.IOConfig[Pin];
  unsigned char _tmp= NOT_IOMASK[Pin];
+#ifndef USEASM
  if(Pin<5)
  {
-#asm
-     movf  SetOutputConfig@_tmp,w
-     movwf ??_SetOutputConfig
-     movf  ??_SetOutputConfig,w
-     movlb 0
-     andwf 13,f
-     movlb 1
-     andwf 13,f
-     movlb 3
-     andwf 13,f
-#endasm
- //    PORTB &= _tmp;
- //    TRISB &= _tmp;
- //    ANSELB &= _tmp;
+     PORTB &= _tmp;
+     TRISB &= _tmp;
+     ANSELB &= _tmp;
  }
  else
  {
-#asm
+     PORTA &= _tmp;
+     TRISA &= _tmp;
+     ANSELA &= _tmp;
+ }
+ 
+#else
+ if(Pin<5)
+ {
+    #asm
+     movf  SetOutputConfig@_tmp,w
+     movwf ??_SetOutputConfig
+     movf  ??_SetOutputConfig,w
+     movlb 0
+     andwf 13,f
+     movlb 1
+     andwf 13,f
+     movlb 3
+     andwf 13,f
+    #endasm
+ }
+ else
+ {
+    #asm
      movf  SetOutputConfig@_tmp,w
      movwf ??_SetOutputConfig
      movf  ??_SetOutputConfig,w
@@ -434,39 +453,11 @@ void SetOutputConfig(unsigned char Pin)
      andwf 12,f
      movlb 3
      andwf 12,f
-#endasm
-
-//     PORTA &= _tmp;
-//     TRISA &= _tmp;
-//     ANSELA &= _tmp;
+    #endasm
  }
+#endif 
 }
-/*ovf	SetOutputConfig@_tmp,w
-  4553  0016' 0082'              	movwf	??_SetOutputConfig
-  4554  0017' 0802'              	movf	??_SetOutputConfig,w
-  4555  0018' 0020               	movlb	0	; select bank0
-  4556  0019' 058D               	andwf	13,f	;volatile
-  4557                           
-  4558                           ;main.c: 398: TRISB &= _tmp;
-  4559  001A' 0805'              	movf	SetOutputConfig@_tmp,w
-  4560  001B' 0082'              	movwf	??_SetOutputConfig
-  4561  001C' 0802'              	movf	??_SetOutputConfig,w
-  4562  001D' 0021               	movlb	1	; select bank1
-  4563  001E' 058D               	andwf	13,f	;volatile
-  4564                           
-  4565                           ;main.c: 399: ANSELB &= _tmp;
-  4566  001F' 0805'              	movf	SetOutputConfig@_tmp,w
-  4567  0020' 0082'              	movwf	??_SetOutputConfig
-  4568  0021' 0802'              	movf	??_SetOutputConfig,w
-  4569  0022' 0023               	movlb	3	; select bank3
-  4570  0023' 058D               	andwf	13,f	;volatile
 
-      //PORTB &= ServoMask
-#asm
-        movf _ServoMask,w
-        andwf _PORTB,f
-#endasm
-*/
 char SetPWMConfig(unsigned char Pin,unsigned short value)
 {
 
@@ -670,88 +661,108 @@ static void interrupt isr(void){
 
 
 // timer 1 use by R/C Servo
-    if(TMR1IE)
-    if(TMR1IF)
+if(TMR1IE)
+if(TMR1IF)
 {
     TMR1IF=0;
     if(ServoIndex<5)
     {
-      //PORTB &= ServoMask
-#asm
+    #ifndef USEASM
+      PORTB &= ServoMask;
+    #else
+      {          
+        #asm
         movf _ServoMask,w
         andwf _PORTB,f
-#endasm
+        #endasm
+      }
+    #endif
     }
     else
     {
-      // PORTA &= ServoMask
-#asm
+      #ifndef USEASM
+        PORTA &= ServoMask;
+      #else
+      {          
+        #asm
         movf _ServoMask,w
         andwf _PORTA,f
-#endasm
+        #endasm
+      }
+      #endif
     }
     TMR1ON=0;
-  }
+}
+    
 if(IOCIE)
 if(IOCIF)
- {
+{
 //    IOCBF=0;
 
-//      _TMR0 = TMR0;
-#asm
-    movf _TMR0,w
-    movwf __TMR0
-#endasm
-
-      if(IOCBF & DHTFlag)
+    #ifndef USEASM
+       _TMR0 = TMR0;
+    #else
       {
+        #asm
+            movf _TMR0,w
+            movwf __TMR0
+        #endasm
+      }
+    #endif
+
+    if(IOCBF & DHTFlag)
+    {
           // to speed up things, reducing interrupt process ,
           // store timer 0 info into  circular buffer and
           // figure out timing calculation on main program
-// use assembly (2 us faster)
-//          DHTBitBuffer[DHTBufferIndex++]=_TMR0;
-//          if(DHTBufferIndex<46)
-//              DHTBufferIndex++;
-//          TMR0=0;
+        #ifndef USEASM
 
-#asm
-   clrf _TMR0
-   banksel(_DHTBufferIndex)
-   movf _DHTBufferIndex^512,w
-   addlw 0x20
-   movwf 6
-   movlw 2
-   movwf 7
-   movf _DHTBufferIndex^512,w
-   sublw 45
-   skipnc
-   incf _DHTBufferIndex^512,f
-   banksel(0)
-   movf __TMR0,w
-   movwf 1
-; IOCBF&=~DHTFlag;
-   comf _DHTFlag,w
-   movlb 7; select bank 7
-   andwf _IOCBF&0x7f,f
-#endasm
-
- }
+          DHTBitBuffer[DHTBufferIndex++]=_TMR0;
+          if(DHTBufferIndex<46)
+              DHTBufferIndex++;
+          TMR0=0;
+        #else
+          {
+            #asm
+               clrf _TMR0
+               banksel(_DHTBufferIndex)
+               movf _DHTBufferIndex^512,w
+               addlw 0x20
+               movwf 6
+               movlw 2
+               movwf 7
+               movf _DHTBufferIndex^512,w
+               sublw 45
+               skipnc
+               incf _DHTBufferIndex^512,f
+               banksel(0)
+               movf __TMR0,w
+               movwf 1
+            ; IOCBF&=~DHTFlag;
+               comf _DHTFlag,w
+               movlb 7; select bank 7
+               andwf _IOCBF&0x7f,f
+            #endasm
+          }
+        #endif
+    }
 
 //}
-
-    //  _temp = IOCBF & IOCBN;
+    #ifndef USEASM
+      _temp =(unsigned char) (IOCBF & IOCBN);
+    #else
     {
-#asm
-    movlb  7 ; select bank7
-    movf   22,w
-    andwf  21,w
-    skipnz
-    goto SKIPIOC
-    movlb  0
-    movwf isr@_temp
-#endasm            
+    #asm
+        movlb  7 ; select bank7
+        movf   22,w
+        andwf  21,w
+        skipnz
+        goto SKIPIOC
+        movlb  0
+        movwf isr@_temp
+    #endasm            
     }
-    
+    #endif
     if(_temp&8)
     {
         //IO0
@@ -935,7 +946,7 @@ INCCOUNTERIO4:
 
         }
     }
- }
+}
 
 asm ("SKIPIOC:");   // fast lane to skip IOC
 
@@ -948,19 +959,25 @@ asm ("SKIPIOC:");   // fast lane to skip IOC
     TMR1IF=0;
     if(ServoIndex<5)
     {
-      //PORTB &= ServoMask
-#asm
-        movf _ServoMask,w
-        andwf _PORTB,f
-#endasm
+     #ifndef USEASM
+      PORTB &= ServoMask;
+     #else
+        #asm
+                movf _ServoMask,w
+                andwf _PORTB,f
+        #endasm
+     #endif
     }
     else
     {
-      // PORTA &= ServoMask
-#asm
-        movf _ServoMask,w
-        andwf _PORTA,f
-#endasm
+     #ifndef USEASM        
+      PORTA &= ServoMask;
+     #else
+        #asm
+                movf _ServoMask,w
+                andwf _PORTA,f
+        #endasm
+     #endif
     }
     TMR1ON=0;
   }
@@ -976,90 +993,12 @@ if(TMR2IF){
      //Tell system to Transfer/reset counter
      IOCounterReset.Byte = IOCounterFlag.Byte;
 
-/*
-     if(IOCounterFlag.IO0)
-     {
-
-#asm
-        banksel(_IOSensorData)
-        movf (_COUNTER+0)^384,w
-        movwf (_IOSensorData+4+ARRAY0)^384
-        movf (_COUNTER+1)^384,w
-        movwf (_IOSensorData+5+ARRAY0+1)^384
-        clrf (_COUNTER+0)^384
-        clrf (_COUNTER+1)^384
-
-#endasm
-
-    }
-
-     if(IOCounterFlag.IO1)
-     {
-
-#asm
-        banksel(_IOSensorData)
-        movf (_COUNTER+2)^384,w
-        movwf (_IOSensorData+4+ARRAY1)^384
-        movf (_COUNTER+3)^384,w
-        movwf (_IOSensorData+5+ARRAY1)^384
-        clrf (_COUNTER+2)^384
-        clrf (_COUNTER+3)^384
-
-#endasm
-     }
-
-    if(IOCounterFlag.IO2)
-     {
-
-#asm
-        banksel(_IOSensorData)
-        movf (_COUNTER+4)^384,w
-        movwf (_IOSensorData+4+ARRAY2)^384
-        movf (_COUNTER+5)^384,w
-        movwf (_IOSensorData+5+ARRAY2)^384
-        clrf (_COUNTER+4)^384
-        clrf (_COUNTER+5)^384
-
-#endasm
-     }
-
-    if(IOCounterFlag.IO3)
-     {
-
-#asm
-        banksel(_IOSensorData)
-        movf (_COUNTER+6)^384,w
-        movwf (_IOSensorData+4+ARRAY3)^384
-        movf (_COUNTER+7)^384,w
-        movwf (_IOSensorData+5+ARRAY3)^384
-        clrf (_COUNTER+6)^384
-        clrf (_COUNTER+7)^384
-
-#endasm
-     }
-
-    if(IOCounterFlag.IO4)
-     {
-
-#asm
-        banksel(_IOSensorData)
-        movf (_COUNTER+8)^384,w
-        movwf (_IOSensorData+4+ARRAY4)^384
-        movf (_COUNTER+9)^384,w
-        movwf (_IOSensorData+5+ARRAY4)^384
-        clrf (_COUNTER+8)^384
-        clrf (_COUNTER+9)^384
-
-#endasm
-     }
-*/
-
-#asm
-     // need to set bank since we play with it in assembly
-     // TimerSecFlag is a bit so need to dive by 8
-     // banksel should be 0 anyway but just in case
-     banksel(_TimerSecFlag/8)
-#endasm
+    #asm
+         // need to set bank since we play with it in assembly
+         // TimerSecFlag is a bit so need to dive by 8
+         // banksel should be 0 anyway but just in case
+         banksel(_TimerSecFlag/8)
+    #endasm
   TimerSecFlag=0;
  }
 
@@ -1091,7 +1030,16 @@ if(TMR2IF){
         WaitForEndDeciSecond=1;
        
     }
-     TimerDeciSec--;
+     
+     
+    {
+//     TimerDeciSec--;
+#asm
+     decf _TimerDeciSec,f
+#endasm
+    }
+    
+    
      if(TimerDeciSec==0)
      {
 //         TimerDeciSec=10;
@@ -1581,16 +1529,18 @@ void SendBytesFrame(unsigned char _Address)
 // use FSR0 = IOSensor[_Address]
 // and FSR1 = _modbusPacketBuffer[3]
 // IOSensorData =0x1A0
-//
-//       di()
-//              for(loop=0;loop<NByte;loop++)
-//        {
-//          _temp= tSensor.BYTE[loop];
-//          ModbusPacketBuffer[3+loop]=_temp;
-//        }
-//       ei()
 
+#ifndef USEASM
+       di();
+        for(loop=0;loop<NByte;loop++)
+        {
+          _temp= IOSensorData[_Address].BYTE[loop];
+          ModbusPacketBuffer[(unsigned char)(3+loop)]=(char)_temp;
+        }
+       ei();
+#else
        _temp = _Address * sizeof(SensorDataUnion);
+       {
        #asm
        movlw _IOSensorData/256
        movwf FSR0H
@@ -1603,19 +1553,22 @@ void SendBytesFrame(unsigned char _Address)
        movwf FSR1L
        movf SendBytesFrame@NByte,w
        movwf SendBytesFrame@loop
-#endasm
+       #endasm
+       }
       // ok move NBytes without interrupt
        di();
-#asm
+       {
+        #asm
 BYTELOOP:
         movf  INDF0,w
         movwi FSR1++
         incf FSR0L,f
         decfsz SendBytesFrame@loop,f
         goto BYTELOOP
-#endasm
+        #endasm
+       }
          ei();
-
+#endif
        SendModbusPacket((unsigned char) (NByte+3));
      }
 }

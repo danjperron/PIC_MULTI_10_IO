@@ -116,14 +116,14 @@ unsigned char SlaveAddress;
 
 
 extern SettingStruct Setting;
-
 #define BAUD 9600
+//#define BAUD 57600
 //#define BAUD 19200
 //#define BAUD 38400
 //#define BAUD 57600
 //#define BAUD 115200
 
-//#define USE_EXTERNAL_XTAL
+#define USE_EXTERNAL_XTAL
 
 #ifndef _XTAL_FREQ
 #define _XTAL_FREQ 32000000

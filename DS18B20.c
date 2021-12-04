@@ -11,7 +11,7 @@
 #include "DS18B20.h"
 #include "IOConfig.h"
 
-
+extern unsigned char CRC8(unsigned char * addr, unsigned char num);
 void DS18B20CycleIdle(void)
 {
  unsigned short _temp;
@@ -95,36 +95,35 @@ unsigned char DS18B20Read()
      SetOutputMode(CurrentIOPin);
      WriteIO(CurrentIOPin,0);
  
-     GIE=0;
+     di();
 
  // delay 0.75 us the return from write io and set inputmode should do the time
+     {
 #asm
-     nop
-     nop
-     nop
-     nop
      nop
      nop
      nop
      nop
  #endasm
-
+     }
      SetInputMode(CurrentIOPin);
-
+     {
 #asm
      nop
+     nop
+     nop
+     nop
 #endasm
+     }
    // delay 1us
-   SetTimer6Delay500ns(2);
-   while(!TMR6IF);
+   //SetTimer6Delay500ns(2);
+   //while(!TMR6IF);
    if(ReadIOPin(CurrentIOPin)>0)
    {
-       GIE=1;
        result |= mask;
    }
-   else
-   GIE=1;
-      // delay 60-1-5 = 54 us
+   ei();
+   // delay 60-1-5 = 54 us
      SetTimer6Delay500ns(120);
      while(!TMR6IF);
      mask <<=1;
@@ -233,17 +232,25 @@ void DoDS18B20Cycle(void)
     case IO_CYCLE_DS18B20_READ_BYTE:
 
                         WorkingSensorData.BYTE[ByteIndex]=DS18B20Read();
-                        ByteIndex++;
-                        if(ByteIndex>5)
+                        {
+                        //ByteIndex++;
+                        #asm
+                            incf _ByteIndex,f
+                        #endasm
+                        }
+                        if(ByteIndex>8)
                            {
                             CurrentIOCycle=IO_CYCLE_END;
-                            CurrentIOStatus=IO_STATUS_OK;
-                           }
+                           CurrentIOStatus= (CRC8((unsigned char *)&WorkingSensorData.BYTE[0],8)== (WorkingSensorData.BYTE[8])) ? IO_STATUS_OK : IO_STATUS_CRC;
+                           // CurrentIOStatus = IO_STATUS_OK;   
+                        }
                        return;           
   } 
-
-   CurrentIOCycle++;    
+  {
+   //CurrentIOCycle++;
+#asm
+      movlb 0
+      incf _CurrentIOCycle,f
+#endasm
+  }   
 }
-
-
-

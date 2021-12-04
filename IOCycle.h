@@ -50,6 +50,7 @@ extern near volatile IOBits_t IOCounterReset @ 0x072;
 
 #define IO_STATUS_UNKNOWN 0
 #define IO_STATUS_OK      1
+#define IO_STATUS_CRC     2
 #define IO_STATUS_BAD     0xff
 
 
@@ -63,6 +64,11 @@ typedef union {
     unsigned long  DWORD;
 }SensorDataUnion; 
 
+typedef union {
+    unsigned char BYTE[10];
+    unsigned short WORD[5];
+    unsigned long  DWORD;
+}BigSensorDataUnion; 
 
 // ICOUNTER and IOSensorData are on bank3
 // ARRAYx  use in assembly mode
@@ -74,7 +80,7 @@ typedef union {
 
 
 
-extern SensorDataUnion  WorkingSensorData;
+extern BigSensorDataUnion  WorkingSensorData;
 extern SensorDataUnion  IOSensorData[INPUT_COUNT] @ 0x1A0;
 extern unsigned char  ICOUNTER[5]  @ 0x1E0;
 extern unsigned short COUNTER[5]   @ 0x1E6;

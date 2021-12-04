@@ -21,7 +21,14 @@ void DoRCServo(void)
 
     if(!TMR1ON)
     {
-        ServoIndex++;
+
+//        ServoIndex++;
+    {
+#asm
+       incf _ServoIndex,f 
+#endasm
+    }    
+        
     if(ServoIndex>INPUT_COUNT)
     {
        ServoIndex=0;
@@ -54,27 +61,34 @@ void DoRCServo(void)
          TMR1IF=0;
          TMR1IE=1;
      BMask = IOMASK[ServoIndex];
+     di();
      if(ServoIndex<5)
     {
-
-        di();
-//        PORTB |= BMask;
-#asm
-        movf DoRCServo@BMask,w
-        iorwf 13,f
-#endasm
+        #ifndef USEASM
+             PORTB |= BMask;
+        #else
+            {        
+            #asm
+                    movf DoRCServo@BMask,w
+                    iorwf 13,f
+            #endasm
+            }
+        #endif
     }
     else
     {
-        di();
-//        PORTA |= BMask;
-#asm
-        movf DoRCServo@BMask,w
-        iorwf 12,f
-#endasm
+        #ifndef USEASM
+            PORTA |= BMask;
+        #else
+            {
+            #asm
+                movf DoRCServo@BMask,w
+                iorwf 12,f
+            #endasm
+            }
+        #endif
     }
     TMR1ON=1;
     ei();
     }
-
 }

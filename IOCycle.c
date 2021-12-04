@@ -23,7 +23,7 @@ near unsigned char CurrentIOCycle;
 
 
 SensorDataUnion  IOSensorData[INPUT_COUNT] @ 0x1A0;
-SensorDataUnion  WorkingSensorData;
+BigSensorDataUnion  WorkingSensorData;
 
 // Counter will be on same bank
 // than IOSensor data (bank 3)
@@ -57,7 +57,19 @@ void DealWithError(void)
 {
    TMR0IE=0;
    TMR0IF=0;
+   
+#ifndef USEASM
    WorkingSensorData.WORD[2]=0xFFFF;
+#else
+   {
+   #asm
+     movlw 255
+     movlb 0
+     movwf _WorkingSensorData+5
+     movwf _WorkingSensorData+6
+   #endasm
+   }
+#endif   
    if(CurrentIOSensor.DHT)
       DHT22Error();
 }
@@ -68,12 +80,19 @@ void ScanNextIOPin(void)
   unsigned char loop;
 
   Retry=0;
+#ifndef USEASM
   CurrentIOPin++;
-
+#else
+   {
+   #asm
+      incf _CurrentIOPin,f
+   #endasm
+   }
+#endif
   if(CurrentIOPin >= INPUT_COUNT)
    CurrentIOPin=0;
 
-  CurrentIOSensor .Config= Setting.IOConfig[CurrentIOPin];
+  CurrentIOSensor.Config= Setting.IOConfig[CurrentIOPin];
   CurrentIOCycle= IO_CYCLE_IDLE;
   CurrentIOStatus=IO_STATUS_UNKNOWN;
   Timerms=0;
@@ -109,7 +128,24 @@ void DoIOCycle(void)
 
     
     if(CurrentIOStatus==IO_STATUS_BAD)
+    {
+     
+#ifndef USEASM
         SensorPt->WORD[0]=0xffff;
+#else
+        {
+        #asm
+            movf DoIOCycle@SensorPt,w
+            movwf 6
+            movlw 1
+            movwf 7
+            movlw 255
+            movwi[0]fsr1
+            movwi[1]fsr1
+        #endasm
+        }
+#endif        
+    }
     else
     {
         SensorPt->BYTE[0]=0;
@@ -231,20 +267,16 @@ void WriteIO(unsigned char Pin,unsigned char value)
 
     unsigned char mask = IOMASK[Pin];
     unsigned char nmask = NOT_IOMASK[Pin];
-
+    di();
     if(Pin <5)
     {
        if(value==0)
        {
-           di();
            PORTB &= nmask;
-           ei();
        }
        else
        {
-           di();
            PORTB |= mask;
-           ei();
        }
 
     }
@@ -252,19 +284,15 @@ void WriteIO(unsigned char Pin,unsigned char value)
     {
        if(value==0)
        {
-           di();
            PORTA &= nmask;
-           ei();
        }
        else
        {
-           di();
            PORTA |= mask;
-           ei();
        }
 
     }
-
+    ei();
 
 }
 
@@ -272,31 +300,40 @@ void WriteIO(unsigned char Pin,unsigned char value)
 void SetIOChange(unsigned char Pin, unsigned char value)
 {
     unsigned char _temp;
+    
+    di();
     if(Pin<5)
         if(value==0)
         {
             _temp = NOT_IOMASK[Pin];
-            di();
-//          IOCBN&= _temp;
-#asm
-            movf SetIOChange@_temp,w
-            movlb 7
-            andwf _IOCBN&0x7F,f
-#endasm
-            ei();
+            #ifndef USEASM
+            IOCBN&= _temp;
+            #else
+            {
+                #asm
+                            movf SetIOChange@_temp,w
+                            movlb 7
+                            andwf _IOCBN&0x7F,f
+                #endasm
+            }
+            #endif
         }
          else
          {
             _temp= IOMASK[Pin];
-            di();
-//            IOCBN|= _temp;
-#asm
-            movf SetIOChange@_temp,w
-            movlb 7
-            iorwf _IOCBN&0x7f,f
-#endasm
-            ei();
+            #ifndef USEASM
+                IOCBN|= _temp;
+            #else
+                {
+                #asm
+                            movf SetIOChange@_temp,w
+                            movlb 7
+                            iorwf _IOCBN&0x7f,f
+                #endasm
+                }
+            #endif
          }
+    ei();
 }
 
 

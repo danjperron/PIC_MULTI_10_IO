@@ -119,6 +119,9 @@ IOConfigStruct  configInfo[]={
 unsigned char  IsPinHaveSpecialFunctions[]={1,1,1,1,1,0,0,0,0,0};
 unsigned char  IsPinHavePWM[]=             {1,0,0,1,0,0,0,0,1,1};
 
+uint16_t  MB_Version;
+
+
 int moduleID =0;
 
 int GetConfigIndex(int mode)
@@ -293,6 +296,9 @@ int IsModuleFound(modbus_t * mb, unsigned char  SlaveAddress)
    modbus_set_slave(mb,SlaveAddress);
    if (modbus_read_registers(mb,251,1,&MB_Register) <0)
        return 0;
+   if (modbus_read_registers(mb,250,1,&MB_Version) <0)
+       MB_Version=0;
+
    if(MB_Register == 0x6532)
      return 0x6532;
    if(MB_Register == 0x653A)
@@ -407,6 +413,10 @@ void ReadDS18B20(modbus_t * mb,int _io)
            mask = MB_Register[2] & 0x60;
            Temperature = Factor * ((short)MB_Register[1]);
            printf("Temp: %5.1f Celsius",Temperature);
+         }
+         else if (MB_Register[0]==2)
+         {
+           printf("CRC Error");
          }
          else printf("Error");
        }
@@ -568,7 +578,8 @@ void DisplayIOConfig(modbus_t * mb)
 
     printf("=============\n%d : ",CurrentSlaveAddress);
 
-    printf("Type %04X  Multi Purpose %dIO\n", moduleID, moduleID & 0xf);
+    printf("Type %04X  Multi Purpose %dIO", moduleID, moduleID & 0xf);
+    printf(" , Version:%d.%02d\n",MB_Version >>8, MB_Version & 0xff);
 
 
     for(io=0;io<(moduleID & 0xf);io++)
