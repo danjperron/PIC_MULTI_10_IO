@@ -4,14 +4,14 @@ import time
 
 
 class PicMbus:
-   
+
 
   #CONFIGURATION IO
   IOCONFIG_NONE= 255
-  IOCONFIG_ANALOGVDD= 0  
-  IOCONFIG_ANALOG1V=  1 
-  IOCONFIG_ANALOG2V=  2  
-  IOCONFIG_ANALOG4V=  3  
+  IOCONFIG_ANALOGVDD= 0
+  IOCONFIG_ANALOG1V=  1
+  IOCONFIG_ANALOG2V=  2
+  IOCONFIG_ANALOG4V=  3
   IOCONFIG_INPUT=     4
   IOCONFIG_INPUT_PULLUP= 5
   IOCONFIG_OUTPUT=    6
@@ -36,7 +36,7 @@ class PicMbus:
     self.module.serial.flushInput();
     #ok lire Identification
 #    Id = self.readId()
-   
+ 
 #    Count=0
 #    if  Id == 0x653A:
     Count=10
@@ -150,15 +150,11 @@ class PicMbus:
          self.readConfig(Pin)
      if (self.IOConfig[Pin] & self.IOCONFIG_DS18B20) ==0:
         #return IO  config not set for dht
-        return None
-     while(True):
-        value = self.readSensor(Pin)
-        if value[0] == 0xffff:
-           #No Sensor Found
-           return None
-        Factor = 0.0625
-        Temp = value[1]
-        if(Temp & 0x8000) !=0:
-           Temp-=65536
-        return Temp*Factor
+        return None, 0xffff
+     value = self.readSensor(Pin)
+     Factor = 0.0625
+     Temp = value[1]
+     if(Temp & 0x8000) !=0:
+        Temp-=65536
+     return Temp*Factor, value[0]
 
