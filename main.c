@@ -1391,7 +1391,14 @@ void SendModbusPacket(unsigned char BufferSize)
     //RS-485 on TRANSMISSION
     ModbusOnTransmit=1;
     TXM_ENABLE=1;
+
+    #if BAUD == 9600
+                 __delay_us(1000);
+    #else
+                 __delay_us(200);
+    #endif
     // send data
+    
     for(loop=0;loop<BufferSize;loop++)
         putch(ModbusPacketBuffer[loop]);
     // send CRC
@@ -2328,9 +2335,9 @@ FVRCON=0b11000010;  // Vref internal 2.048V on ADC
          if(!TXIE)
          {
 #if BAUD == 9600
-             __delay_us(800);
+             __delay_us(2000);
 #else
-             __delay_us(200);
+             __delay_us(600);
 #endif
              TXM_ENABLE=0;
              ModbusOnTransmit=0;
