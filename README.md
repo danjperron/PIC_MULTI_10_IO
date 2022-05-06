@@ -5,6 +5,8 @@ RS-485 module with 10  I/O multi-function
 
 Multi-Purpose RS-485 with Modbus Protocol using a small cpu PIC16F1827
 
+Project compiled using MPlab X IDE with XC8 V2.36 using C90 standard (compiler optimization=2)
+
 
   The PIC  C code 
   
